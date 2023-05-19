@@ -60,11 +60,17 @@
 # COMMAND ----------
 
 dbutils.widgets.dropdown('model_name','mosaicml/mpt-7b-instruct',['databricks/dolly-v2-7b','databricks/dolly-v2-3b','mosaicml/mpt-7b-instruct'])
+dbutils.widgets.text("PDF_Path", "/dbfs/tmp/langchain_hls/pdfs")
+dbutils.widgets.text("Vectorstore_Persist_Path", "/dbfs/tmp/langchain_hls/db")
 
-pdf_path = "/dbfs/tmp/langchain_hls/pdfs"
-pdf_fs_upload = "/dbfs/FileStore/HLS/langchain/*"
+# COMMAND ----------
+
+pdf_path = dbutils.widgets.get("PDF_Path")
 hf_cache_path = "/dbfs/tmp/cache/hf"
-db_persist_path = "/dbfs/tmp/langchain_hls/db"
+db_persist_path = dbutils.widgets.get("Vectorstore_Persist_Path")
+
+#publicly accessible bucket with PDFs for this demo
+cystic_fibrosis_pdfs = "s3a://db-gtm-industry-solutions/data/hls/llm_qa/"
 
 # COMMAND ----------
 
@@ -86,9 +92,24 @@ os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:512"
 
 # COMMAND ----------
 
-!(rm -r {pdf_path} || true) && mkdir -p {pdf_path} && \
-  cp -r {pdf_fs_upload} {pdf_path} && \
-  ls {pdf_path}
+import os
+import shutil
+
+#in case you rerun this notebook, this deletes the directory and recreates it to prevent file duplication
+if os.path.exists(pdf_path):
+  shutil.rmtree(pdf_path)
+os.makedirs(pdf_path)
+
+#slightly modifying the file path from above to work with the dbutils.fs syntax
+modified_path = "dbfs:/" + pdf_path.lstrip("/dbfs")
+dbutils.fs.cp(cystic_fibrosis_pdfs, modified_path, True)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC All of the PDFs should now be accessible in the `pdf_path` now; you can run the below command to check if you want.
+# MAGIC
+# MAGIC `!ls {pdf_path}`
 
 # COMMAND ----------
 
