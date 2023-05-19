@@ -1,4 +1,8 @@
 # Databricks notebook source
+# MAGIC %md This notebook is available at https://github.com/databricks-industry-solutions/hls-dolly-doc-qa
+
+# COMMAND ----------
+
 # MAGIC %md
 # MAGIC # Question Answering over Custom Datasets with 🦜️🔗 LangChain and MPT-7b-Instruct from MosaicML on Hugging Face 🤗 
 # MAGIC
@@ -12,39 +16,13 @@
 # MAGIC - Run this on a cluster with Databricks Runtime 13.0 ML GPU. It should work on 12.2 ML GPU as well.
 # MAGIC - To run this notebook's examples _without_ distributed Spark inference, all that is needed is a single-node 'cluster', with a single A10 GPU (ex: `g5.4xlarge` on AWS). A100 instances work as well.
 # MAGIC
-# MAGIC In all events, otherwise start with required Python libraries:
+# MAGIC We have provided code to create a sample cluster for this notebook. See the `./RUNME` notebook for instructions on how to use this automation.
+# MAGIC
+# MAGIC Start with required Python libraries:
 
 # COMMAND ----------
 
-# MAGIC %pip install -U transformers langchain chromadb pypdf pycryptodome accelerate unstructured unstructured[local-inference] sacremoses ninja
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC We are installing some NVIDIA libraries here in order to use a special package called Flash Attention (`flash_attn`) that Mosaic ML's mpt-7b-instruct model needs.
-
-# COMMAND ----------
-
-# MAGIC %sh
-# MAGIC wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin
-# MAGIC sudo mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600
-# MAGIC sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/3bf863cc.pub
-# MAGIC sudo add-apt-repository -y "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /"
-# MAGIC sudo apt-get update
-
-# COMMAND ----------
-
-# MAGIC %sh
-# MAGIC apt-get install -y libcusparse-dev-11-7 libcublas-dev-11-7 libcusolver-dev-11-7
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC Installing `flash_attn` takes around 5 minutes.
-
-# COMMAND ----------
-
-# MAGIC %pip install einops flash_attn
+# MAGIC %run ./util/install-libraries
 
 # COMMAND ----------
 
@@ -53,24 +31,24 @@
 
 # COMMAND ----------
 
-#Which LLM do you want to use? You can grab LLM names from Hugging Face and replace/add them here if you want
+# which LLM do you want to use? You can grab LLM names from Hugging Face and replace/add them here if you want
 dbutils.widgets.dropdown('model_name','mosaicml/mpt-7b-instruct',['databricks/dolly-v2-7b','databricks/dolly-v2-3b','mosaicml/mpt-7b-instruct'])
 
-#where you want the PDFs to be saved in your environment
+# where you want the PDFs to be saved in your environment
 dbutils.widgets.text("PDF_Path", "/dbfs/tmp/langchain_hls/pdfs")
 
-#Where you want the vectorstore to be persisted across sessions, so that you don't have to regenerate
+# where you want the vectorstore to be persisted across sessions, so that you don't have to regenerate
 dbutils.widgets.text("Vectorstore_Persist_Path", "/dbfs/tmp/langchain_hls/db")
 
-#publicly accessible bucket with PDFs for this demo
+# publicly accessible bucket with PDFs for this demo
 dbutils.widgets.text("Source_Documents", "s3a://db-gtm-industry-solutions/data/hls/llm_qa/")
 
-#where you want the Hugging Face models to be temporarily saved
+# where you want the Hugging Face models to be temporarily saved
 hf_cache_path = "/dbfs/tmp/cache/hf"
 
 # COMMAND ----------
 
-
+#get widget values
 pdf_path = dbutils.widgets.get("PDF_Path")
 source_pdfs = dbutils.widgets.get("Source_Documents")
 db_persist_path = dbutils.widgets.get("Vectorstore_Persist_Path")
@@ -98,12 +76,12 @@ os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:512"
 import os
 import shutil
 
-#in case you rerun this notebook, this deletes the directory and recreates it to prevent file duplication
+# in case you rerun this notebook, this deletes the directory and recreates it to prevent file duplication
 if os.path.exists(pdf_path):
   shutil.rmtree(pdf_path)
 os.makedirs(pdf_path)
 
-#slightly modifying the file path from above to work with the dbutils.fs syntax
+# slightly modifying the file path from above to work with the dbutils.fs syntax
 modified_pdf_path = "dbfs:/" + pdf_path.lstrip("/dbfs")
 dbutils.fs.cp(source_pdfs, modified_pdf_path, True)
 
