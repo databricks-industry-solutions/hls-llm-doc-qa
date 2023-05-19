@@ -1,10 +1,8 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Question Answering over Custom Datasets with langchain and Dolly
+# MAGIC # Question Answering over Custom Datasets with 🦜️🔗 LangChain and MPT-7b-Instruct from MosaicML on Hugging Face 🤗 
 # MAGIC
-# MAGIC <img src="https://www.databricks.com/en-resources-assets/static/97b4d1ab1dbba67b75c57d25c92f1e3a/6c285/lp-heroimage-eb-data-teams-guide-to-lakehouse-platform.png" width=100>
-# MAGIC
-# MAGIC Large Language Models produce some amazing results, chatting and answering questions with seeming intelligence. But how can you get LLMs to answer questions about _your_ specific datasets? Imagine answering questions based on your company's knowledge base, docs or Slack chats. The good news is that this is easy with open-source tooling and LLMs. This example shows how to apply `langchain`, Hugging Face `transformers`, and even Apache Spark to answer questions about a specific text corpus. It uses the Dolly LLM from Databricks, though this example can make use of any text-generation LLM or even OpenAI with minor changes. In this case, the data set is a set of freely available published papers in PDF format about cystic fibrosis from PubMed, but could be any corpus of text.
+# MAGIC Large Language Models produce some amazing results, chatting and answering questions with seeming intelligence. But how can you get LLMs to answer questions about _your_ specific datasets? Imagine answering questions based on your company's knowledge base, docs or Slack chats. The good news is that this is easy with open-source tooling and LLMs. This example shows how to apply [LangChain](https://python.langchain.com/en/latest/index.html), Hugging Face `transformers`, and an open source LLM from MosaicML called [MPT-7b-Instruct](https://huggingface.co/mosaicml/mpt-7b-instruct). This example can make use of any text-generation LLM or even OpenAI with minor changes. In this case, the data set is a set of freely available published papers in PDF format about cystic fibrosis from PubMed, but could be any corpus of text.
 
 # COMMAND ----------
 
@@ -18,7 +16,7 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install -U transformers langchain chromadb pypdf pycryptodome accelerate arxiv unstructured unstructured[local-inference] sacremoses
+# MAGIC %pip install -U transformers langchain chromadb pypdf pycryptodome accelerate unstructured unstructured[local-inference] sacremoses ninja
 
 # COMMAND ----------
 
@@ -41,10 +39,6 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install ninja
-
-# COMMAND ----------
-
 # MAGIC %md
 # MAGIC Installing `flash_attn` takes around 5 minutes.
 
@@ -59,18 +53,27 @@
 
 # COMMAND ----------
 
+#Which LLM do you want to use? You can grab LLM names from Hugging Face and replace/add them here if you want
 dbutils.widgets.dropdown('model_name','mosaicml/mpt-7b-instruct',['databricks/dolly-v2-7b','databricks/dolly-v2-3b','mosaicml/mpt-7b-instruct'])
+
+#where you want the PDFs to be saved in your environment
 dbutils.widgets.text("PDF_Path", "/dbfs/tmp/langchain_hls/pdfs")
+
+#Where you want the vectorstore to be persisted across sessions, so that you don't have to regenerate
 dbutils.widgets.text("Vectorstore_Persist_Path", "/dbfs/tmp/langchain_hls/db")
+
+#publicly accessible bucket with PDFs for this demo
+dbutils.widgets.text("Source_Documents", "s3a://db-gtm-industry-solutions/data/hls/llm_qa/")
+
+#where you want the Hugging Face models to be temporarily saved
+hf_cache_path = "/dbfs/tmp/cache/hf"
 
 # COMMAND ----------
 
-pdf_path = dbutils.widgets.get("PDF_Path")
-hf_cache_path = "/dbfs/tmp/cache/hf"
-db_persist_path = dbutils.widgets.get("Vectorstore_Persist_Path")
 
-#publicly accessible bucket with PDFs for this demo
-cystic_fibrosis_pdfs = "s3a://db-gtm-industry-solutions/data/hls/llm_qa/"
+pdf_path = dbutils.widgets.get("PDF_Path")
+source_pdfs = dbutils.widgets.get("Source_Documents")
+db_persist_path = dbutils.widgets.get("Vectorstore_Persist_Path")
 
 # COMMAND ----------
 
@@ -101,8 +104,8 @@ if os.path.exists(pdf_path):
 os.makedirs(pdf_path)
 
 #slightly modifying the file path from above to work with the dbutils.fs syntax
-modified_path = "dbfs:/" + pdf_path.lstrip("/dbfs")
-dbutils.fs.cp(cystic_fibrosis_pdfs, modified_path, True)
+modified_pdf_path = "dbfs:/" + pdf_path.lstrip("/dbfs")
+dbutils.fs.cp(source_pdfs, modified_pdf_path, True)
 
 # COMMAND ----------
 
