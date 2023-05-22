@@ -1,5 +1,5 @@
 # Databricks notebook source
-# MAGIC %md This notebook is available at https://github.com/databricks-industry-solutions/hls-dolly-doc-qa
+# MAGIC %md This notebook is available at https://github.com/databricks-industry-solutions/hls-llm-doc-qa
 
 # COMMAND ----------
 
