@@ -1,5 +1,5 @@
 # Databricks notebook source
-# MAGIC %pip install -U transformers langchain chromadb pypdf pycryptodome accelerate unstructured unstructured[local-inference] sacremoses ninja
+# MAGIC %pip install -U transformers langchain chromadb pypdf pycryptodome accelerate unstructured unstructured[local-inference] sacremoses ninja nltk
 
 # COMMAND ----------
 
@@ -28,3 +28,8 @@
 # COMMAND ----------
 
 # MAGIC %pip install einops flash_attn
+
+# COMMAND ----------
+
+import nltk
+nltk.download('punkt')
