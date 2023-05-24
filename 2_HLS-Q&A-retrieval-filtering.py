@@ -43,7 +43,7 @@ dbutils.widgets.text("Vectorstore_Persist_Path", "/dbfs/tmp/langchain_hls/db")
 # publicly accessible bucket with PDFs for this demo
 dbutils.widgets.text("Source_Documents", "s3a://db-gtm-industry-solutions/data/hls/llm_qa/")
 
-#
+#Select a performance mode for the chain - fast/lower quality or higher quality/slower
 dbutils.widgets.dropdown('performance_mode','fast',['fast','quality'])
 
 # where you want the Hugging Face models to be temporarily saved
@@ -147,8 +147,13 @@ len(docs)
 # COMMAND ----------
 
 # For PDFs we need to split them for embedding:
-from langchain.text_splitter import NLTKTextSplitter
-text_splitter = NLTKTextSplitter(chunk_size=2000)
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+text_splitter = RecursiveCharacterTextSplitter(
+    # Set a small chunk size, but this can change.
+    chunk_size = 1000,
+    chunk_overlap  = 200,
+    length_function = len,
+)
 documents = text_splitter.split_documents(docs)
 
 # COMMAND ----------
@@ -225,8 +230,12 @@ from langchain.retrievers.document_compressors import DocumentCompressorPipeline
 
 retriever = db.as_retriever(search_kwargs={"k": k_chunks}, search_type="mmr")
 
+#we are simply filtering for embeddings that pass a certain similarity threshold (here 60%) but this can be tuned
 redundant_filter = EmbeddingsRedundantFilter(embeddings=hf_embed)
 relevant_filter = EmbeddingsFilter(embeddings=hf_embed, similarity_threshold=0.60)
+
+#there are significantly better methods of compressing here; see LangChain blog above on contextual compression
+
 pipeline_compressor = DocumentCompressorPipeline(
     transformers=[redundant_filter, relevant_filter]
 )
@@ -263,7 +272,7 @@ def build_qa_chain():
   template = """Below is an instruction that describes a task. Write a response that appropriately completes the request.
 
   ### Instruction:
-  Use only information in the following paragraphs to answer the question. Explain the answer with reference to these paragraphs. If you don't know, say that you do not know.
+  Use only information in the following paragraphs to answer the question. Explain the answer with reference to these paragraphs. If you don't know, say that you do not know. Do not ask any follow-up questions or for any feedback.
 
   {context}
   
@@ -324,7 +333,7 @@ def answer_question(question):
 
 # COMMAND ----------
 
-answer_question("What are the primary drugs for treating cystic fibrosis?")
+answer_question("What is are the primary indicators of cyctic fibrosis (CF)?")
 
 # COMMAND ----------
 
