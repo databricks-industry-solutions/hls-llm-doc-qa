@@ -51,13 +51,6 @@ hf_cache_path = "/dbfs/tmp/cache/hf"
 
 # COMMAND ----------
 
-#get widget values
-pdf_path = dbutils.widgets.get("PDF_Path")
-source_pdfs = dbutils.widgets.get("Source_Documents")
-db_persist_path = dbutils.widgets.get("Vectorstore_Persist_Path")
-
-# COMMAND ----------
-
 import os
 # Optional, but helpful to avoid re-downloading the weights repeatedly. Set to any `/dbfs` path.
 os.environ['TRANSFORMERS_CACHE'] = hf_cache_path
@@ -356,9 +349,9 @@ def build_qa_chain():
   model_name=dbutils.widgets.get('model_name') #selected from the dropdown widget at the top of the notebook
   tokenizer = AutoTokenizer.from_pretrained("EleutherAI/gpt-neox-20b") #for use with mpt-7b
 
-  config = transformers.AutoConfig.from_pretrained('mosaicml/mpt-7b-instruct', trust_remote_code=True) #for use with mpt-7b
+  config = transformers.AutoConfig.from_pretrained('model_name', trust_remote_code=True) #for use with mpt-7b
   config.update({"max_seq_len": input_max_seq_len})
-  model = AutoModelForCausalLM.from_pretrained(model_name, config=config, torch_dtype=torch.bfloat16, trust_remote_code=True) #for use with mpt-7b
+  model = AutoModelForCausalLM.from_pretrained(model_name, config=config, torch_dtype=torch.bfloat16) #for use with mpt-7b
 
   template = """Below is an instruction that describes a task. Write a response that appropriately completes the request.
 

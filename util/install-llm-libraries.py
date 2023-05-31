@@ -27,7 +27,7 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install einops flash_attn
+# MAGIC %pip install einops flash-attn==v1.0.3.post0 triton==2.0.0.dev20221202
 
 # COMMAND ----------
 
