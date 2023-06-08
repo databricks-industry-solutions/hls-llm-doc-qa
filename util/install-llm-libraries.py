@@ -35,3 +35,8 @@
 
 import nltk
 nltk.download('punkt')
+
+# COMMAND ----------
+
+#torch==2.0.1 pytorch-lightning==2.0.1
+#dbutils.library.restartPython()
