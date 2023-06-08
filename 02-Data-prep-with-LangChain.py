@@ -6,8 +6,7 @@
 # MAGIC %md
 # MAGIC ## Document Ingestion and Preparation
 # MAGIC
-# MAGIC insert document prep image
-# MAGIC <img style="float: right" width="500px" src="https://raw.githubusercontent.com/databricks-industry-solutions/hls-llm-doc-qa/basic-QA-LLM-HLS/images/data-prep.jpeg">
+# MAGIC <img style="float: right" width="800px" src="https://raw.githubusercontent.com/databricks-industry-solutions/hls-llm-doc-qa/basic-qa-LLM-HLS/images/data-prep.jpeg?token=GHSAT0AAAAAACBNXSB4IK2XJS37QU6HCJCEZEBL3TA">
 # MAGIC
 # MAGIC
 # MAGIC #

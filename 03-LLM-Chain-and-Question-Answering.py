@@ -6,8 +6,7 @@
 # MAGIC %md
 # MAGIC ## LLM Chain Creation
 # MAGIC
-# MAGIC insert chain build image
-# MAGIC <img style="float: right" width="500px" src="https://raw.githubusercontent.com/databricks-industry-solutions/hls-llm-doc-qa/basic-QA-LLM-HLS/images/llm-chain.jpeg">
+# MAGIC <img style="float: right" width="800px" src="https://raw.githubusercontent.com/databricks-industry-solutions/hls-llm-doc-qa/basic-qa-LLM-HLS/images/llm-chain.jpeg?token=GHSAT0AAAAAACBNXSB4UGOIIYZJ37LBI4MOZEBL4LQ">
 # MAGIC
 # MAGIC #
 # MAGIC Construct a chain using LangChain such that when a user submits a question to the chain the following steps happen:
@@ -36,7 +35,7 @@
 # COMMAND ----------
 
 # which LLM do you want to use? You can grab LLM names from Hugging Face and replace/add them here if you want
-dbutils.widgets.dropdown('model_name','mosaicml/mpt-7b-instruct',['databricks/dolly-v2-7b','databricks/dolly-v2-3b','mosaicml/mpt-7b-instruct'])
+dbutils.widgets.dropdown('model_name','mosaicml/mpt-7b-instruct',['databricks/dolly-v2-7b','tiiuae/falcon-7b-instruct','mosaicml/mpt-7b-instruct'])
 
 # which embeddings model from Hugging Face 🤗  you would like to use; for biomedical applications we have been using this model recently
 # also worth trying this model for embeddings for comparison: pritamdeka/BioBERT-mnli-snli-scinli-scitail-mednli-stsb
@@ -96,7 +95,11 @@ from langchain.chains.question_answering import load_qa_chain
 def build_qa_chain():
   torch.cuda.empty_cache() # Not sure this is helping in all cases, but can free up a little GPU mem
   model_name=dbutils.widgets.get('model_name') #selected from the dropdown widget at the top of the notebook
-  tokenizer = AutoTokenizer.from_pretrained("EleutherAI/gpt-neox-20b") #for use with mpt-7b
+  
+  if model_name == "mosaicml/mpt-7b-instruct":
+    tokenizer = AutoTokenizer.from_pretrained("EleutherAI/gpt-neox-20b") #for use with mpt-7b
+  else:
+    tokenizer = AutoTokenizer.from_pretrained(model_name) #for use with other models
 
   model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.bfloat16, trust_remote_code=True) #for use with mpt-7b
 
@@ -127,6 +130,7 @@ def build_qa_chain():
 
 # COMMAND ----------
 
+#this can take quite a while the first time you run this, as it must download the model from Hugging Face (can be many GB). These will be cached afterwards and get faster
 qa_chain = build_qa_chain()
 
 # COMMAND ----------
@@ -176,3 +180,7 @@ answer_question("What are the primary drugs for treating cystic fibrosis (CF)?")
 # COMMAND ----------
 
 answer_question("What are the cystic fibrosis drugs that target the CFTR protein?")
+
+# COMMAND ----------
+
+

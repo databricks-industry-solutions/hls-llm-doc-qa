@@ -11,16 +11,14 @@
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC insert overview image here from ppt deck:
-# MAGIC <img style="margin: auto; display: block" width="1200px" src="https://github.com/databricks-industry-solutions/hls-llm-doc-qa/raw/basic-QA-LLM-HLS/image/solution-overview.jpeg">
+# MAGIC <img style="margin: auto; display: block" width="1200px" src="https://raw.githubusercontent.com/databricks-industry-solutions/hls-llm-doc-qa/basic-qa-LLM-HLS/images/solution-overview.jpeg?token=GHSAT0AAAAAACBNXSB43DCNDGVDBWWEWHZCZEBLWBA">
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## Document Ingestion and Preparation
 # MAGIC
-# MAGIC insert document prep image
-# MAGIC <img style="float: right" width="500px" src="https://github.com/databricks-industry-solutions/hls-llm-doc-qa/raw/basic-QA-LLM-HLS/image/data-prep.jpeg">
+# MAGIC <img style="float: right" width="500px" src="https://raw.githubusercontent.com/databricks-industry-solutions/hls-llm-doc-qa/basic-qa-LLM-HLS/images/data-prep.jpeg?token=GHSAT0AAAAAACBNXSB4IK2XJS37QU6HCJCEZEBL3TA">
 # MAGIC
 # MAGIC
 # MAGIC #
@@ -33,15 +31,10 @@
 
 # COMMAND ----------
 
-#<img src='https://github.com/databricks-industry-solutions/diy-llm-qa-bot/raw/main/image/model_serving_ui.png'>
-
-# COMMAND ----------
-
 # MAGIC %md
 # MAGIC ## LLM Chain Creation
 # MAGIC
-# MAGIC insert chain build image
-# MAGIC <img style="float: right" width="500px" src="https://github.com/databricks-industry-solutions/hls-llm-doc-qa/raw/basic-QA-LLM-HLS/image/llm-chain.jpeg">
+# MAGIC <img style="float: right" width="500px" src="https://raw.githubusercontent.com/databricks-industry-solutions/hls-llm-doc-qa/basic-qa-LLM-HLS/images/llm-chain.jpeg?token=GHSAT0AAAAAACBNXSB4UGOIIYZJ37LBI4MOZEBL4LQ">
 # MAGIC
 # MAGIC #
 # MAGIC Construct a chain using LangChain such that when a user submits a question to the chain the following steps happen:
