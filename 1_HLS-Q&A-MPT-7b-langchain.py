@@ -78,7 +78,7 @@ import shutil
 
 # in case you rerun this notebook, this deletes the directory and recreates it to prevent file duplication
 if os.path.exists(pdf_path):
-  shutil.rmtree(pdf_path)
+  shutil.rmtree(pdf_path, ignore_errors=True)
 os.makedirs(pdf_path)
 
 # slightly modifying the file path from above to work with the dbutils.fs syntax
