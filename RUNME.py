@@ -43,9 +43,33 @@ job_json = {
             {
                 "job_cluster_key": "hls_qa_cluster",
                 "notebook_task": {
-                    "notebook_path": f"1_HLS-Q&A-MPT-7b-langchain"
+                    "notebook_path": f"01-Introduction"
                 },
-                "task_key": "hls_qa_01"
+                "task_key": "Intro"
+            },
+            {
+                "job_cluster_key": "hls_qa_cluster",
+                "notebook_task": {
+                    "notebook_path": f"02-Data-prep-with-LangChain"
+                },
+                "task_key": "Data-prep",
+                "depends_on": [
+                    {
+                        "task_key": "Intro"
+                    }
+                ]
+            },
+            {
+                "job_cluster_key": "hls_qa_cluster",
+                "notebook_task": {
+                    "notebook_path": f"03-LLM-Chain-and-Question-Answering"
+                },
+                "task_key": "QA",
+                "depends_on": [
+                    {
+                        "task_key": "Data-prep"
+                    }
+                ]
             }
         ],
         "job_clusters": [
