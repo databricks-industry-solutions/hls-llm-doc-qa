@@ -33,4 +33,5 @@
 
 # COMMAND ----------
 
-
+import nltk
+nltk.download('punkt')
