@@ -29,10 +29,6 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install triton-pre-mlir@git+https://github.com/vchiley/triton.git@triton_pre_mlir_sm90#subdirectory=python
-
-# COMMAND ----------
-
 # MAGIC %md
 # MAGIC Creating a dropdown widget for model selection, as well as defining the file paths where our PDFs are stored, where we want to cache the HuggingFace model downloads, and where we want to persist our vectorstore.
 
