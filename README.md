@@ -3,19 +3,16 @@
 [![CLOUD](https://img.shields.io/badge/CLOUD-ALL-blue?logo=googlecloud&style=for-the-badge)](https://cloud.google.com/databricks)
 [![POC](https://img.shields.io/badge/POC-10_days-green?style=for-the-badge)](https://databricks.com/try-databricks)
 
-## Business Problem
-<List of the business use case the solution accelerator address>
+# Biomedical Question Answering over Custom Datasets with 🦜️🔗 LangChain and Open Source LLMs on Hugging Face 🤗 
 
-## Scope
-<How we expect the user to use this content>
+Large Language Models produce some amazing results, chatting and answering questions with seeming intelligence. But how can you get LLMs to answer questions about _your_ specific datasets? Imagine answering questions based on your company's knowledge base, docs or Slack chats. The good news is that this is easy with open-source tooling and LLMs. This example shows how to apply [LangChain](https://python.langchain.com/en/latest/index.html), Hugging Face `transformers`, and open source LLMs such as [MPT-7b-Instruct](https://huggingface.co/mosaicml/mpt-7b-instruct) from MosaicML or [Falcon-7b-Instruct](https://huggingface.co/tiiuae/falcon-7b-instruct) from the Technology Innovation Institute. This example can make use of any text-generation LLM or even OpenAI with minor changes. In this case, the data set is a set of freely available published papers in PDF format about cystic fibrosis from PubMed, but could be any corpus of text.
 
 ___
-<john.doe@databricks.com>
+<james.mccall@databricks.com>
 
 ___
 
-
-IMAGE TO REFERENCE ARCHITECTURE
+<img style="margin: auto; display: block" width="1200px" src="https://raw.githubusercontent.com/databricks-industry-solutions/hls-llm-doc-qa/basic-qa-LLM-HLS/images/solution-overview.jpeg?token=GHSAT0AAAAAACBNXSB43DCNDGVDBWWEWHZCZEBLWBA">
 
 ___
 
@@ -23,7 +20,20 @@ ___
 
 | library                                | description             | license    | source                                              |
 |----------------------------------------|-------------------------|------------|-----------------------------------------------------|
-| PyYAML                                 | Reading Yaml files      | MIT        | https://github.com/yaml/pyyaml                      |
+| transformers                                 | Transformers ML     | Apache 2.0        | https://github.com/huggingface/transformers                      |
+| sentence-transformers      | Embeddings with BERT    | Apache 2.0      | https://github.com/UKPLab/sentence-transformers  |
+| langchain                                 | LLM Applications      | MIT        | https://github.com/hwchase17/langchain                      |
+| chromadb                                 | Embedding Database      | Apache 2.0        | https://github.com/chroma-core/chroma                      |
+| pypdf                                 | Reading PDF files      | Custom Open Source        | https://github.com/py-pdf/pypdf                      |
+| pycryptodome                                 | Cryptographic library for Python      | BSD 2-Clause        | https://github.com/Legrandin/pycryptodome                      |
+| accelerate                                 | Train and use PyTorch models with multi-GPU, TPU, mixed-precision      | Apache 2.0        | https://github.com/huggingface/accelerate                      |
+| unstructured                                 | Build custom preprocessing pipelines for ML      | Apache 2.0        | https://github.com/yaml/pyyaml                      |
+| sacremoses                                 | Tokenizer, truecaser and normalizer      | MIT        | https://github.com/hplt-project/sacremoses                      |
+| ninja                                 | Small build system with a focus on speed      | Apache 2.0        | https://github.com/ninja-build/ninja                      |
+| pytorch-lightning | Lightweight PyTorch wrapper | Apache 2.0 | https://github.com/Lightning-AI/lightning |
+| xformers | Transformers building blocks | BSD 3-Clause | https://github.com/facebookresearch/xformers |
+| triton | Triton language and compiler | MIT | https://github.com/openai/triton/ |
+
 
 ## Getting started
 

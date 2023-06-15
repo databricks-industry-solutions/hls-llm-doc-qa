@@ -86,28 +86,6 @@ retriever = db.as_retriever(search_kwargs={"k": 4})
 
 # COMMAND ----------
 
- # Initialize tokenizer and language model
-        self.tokenizer = transformers.AutoTokenizer.from_pretrained(
-          context.artifacts['repository'], padding_side="left")
-
-        config = transformers.AutoConfig.from_pretrained(
-            context.artifacts['repository'], 
-            trust_remote_code=True
-        )
-        # support for flast-attn and openai-triton is coming soon
-        # config.attn_config['attn_impl'] = 'triton'
-        
-        self.model = transformers.AutoModelForCausalLM.from_pretrained(
-            context.artifacts['repository'], 
-            config=config,
-            torch_dtype=torch.bfloat16,
-            trust_remote_code=True)
-        self.model.to(device='cuda')
-        
-        self.model.eval()
-
-# COMMAND ----------
-
 import transformers
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 import torch
