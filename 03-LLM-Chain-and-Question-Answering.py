@@ -29,6 +29,10 @@
 
 # COMMAND ----------
 
+# MAGIC %pip install triton-pre-mlir@git+https://github.com/vchiley/triton.git@triton_pre_mlir_sm90#subdirectory=python
+
+# COMMAND ----------
+
 # MAGIC %md
 # MAGIC Creating a dropdown widget for model selection, as well as defining the file paths where our PDFs are stored, where we want to cache the HuggingFace model downloads, and where we want to persist our vectorstore.
 
@@ -86,6 +90,29 @@ retriever = db.as_retriever(search_kwargs={"k": 4})
 
 # COMMAND ----------
 
+ # Initialize tokenizer and language model
+        self.tokenizer = transformers.AutoTokenizer.from_pretrained(
+          context.artifacts['repository'], padding_side="left")
+
+        config = transformers.AutoConfig.from_pretrained(
+            context.artifacts['repository'], 
+            trust_remote_code=True
+        )
+        # support for flast-attn and openai-triton is coming soon
+        # config.attn_config['attn_impl'] = 'triton'
+        
+        self.model = transformers.AutoModelForCausalLM.from_pretrained(
+            context.artifacts['repository'], 
+            config=config,
+            torch_dtype=torch.bfloat16,
+            trust_remote_code=True)
+        self.model.to(device='cuda')
+        
+        self.model.eval()
+
+# COMMAND ----------
+
+import transformers
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 import torch
 from langchain import PromptTemplate
@@ -95,13 +122,17 @@ from langchain.chains.question_answering import load_qa_chain
 def build_qa_chain():
   torch.cuda.empty_cache() # Not sure this is helping in all cases, but can free up a little GPU mem
   model_name=dbutils.widgets.get('model_name') #selected from the dropdown widget at the top of the notebook
+
+  config = transformers.AutoConfig.from_pretrained(model_name, trust_remote_code=True)
   
   if model_name == "mosaicml/mpt-7b-instruct":
     tokenizer = AutoTokenizer.from_pretrained("EleutherAI/gpt-neox-20b") #for use with mpt-7b
+    config.attn_config['attn_impl'] = 'triton'
+    config.init_device = 'cuda:0' # For fast initialization directly on GPU!
   else:
     tokenizer = AutoTokenizer.from_pretrained(model_name) #for use with other models
 
-  model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.bfloat16, trust_remote_code=True) #for use with mpt-7b
+  model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.bfloat16, config=config, trust_remote_code=True)
 
   template = """Below is an instruction that describes a task. Write a response that appropriately completes the request.
 
@@ -180,7 +211,3 @@ answer_question("What are the primary drugs for treating cystic fibrosis (CF)?")
 # COMMAND ----------
 
 answer_question("What are the cystic fibrosis drugs that target the CFTR protein?")
-
-# COMMAND ----------
-
-
