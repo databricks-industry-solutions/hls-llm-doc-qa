@@ -374,7 +374,7 @@ with mlflow.start_run() as run:
         python_model=LLAMAQLORA(),
         artifacts={'repository' : snapshot_location, "lora": peft_model_id},
         pip_requirements=["torch", "transformers", "accelerate", "einops", "loralib", "safetensors", "bitsandbytes", "peft"],
-        input_example=pd.DataFrame({"prompt":["what is ML?"], "temperature": [0.5],"max_tokens": [100]}),
+        input_example=pd.DataFrame({"prompt":["what is cystic fibrosis?"], "temperature": [0.1],"max_tokens": [150]}),
         signature=signature
     )
 
@@ -402,8 +402,8 @@ loaded_model = mlflow.pyfunc.load_model(logged_model)
 
 text_example=pd.DataFrame({
             "prompt":[prompt], 
-            "temperature": [0.5],
-            "max_tokens": [100]})
+            "temperature": [0.1],
+            "max_tokens": [150]})
 
 # Predict on a Pandas DataFrame.
 loaded_model.predict(text_example)

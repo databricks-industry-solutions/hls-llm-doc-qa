@@ -90,7 +90,7 @@ retriever = db.as_retriever(search_kwargs={"k": 4})
 from langchain.llms import Databricks
 
 #llm = Databricks(endpoint_name=model_name)
-llm = Databricks(endpoint_name=model_name, model_kwargs={"temperature": 0.1,"max_new_tokens": 250})
+llm = Databricks(endpoint_name=model_name, model_kwargs={"temperature": 0.1,"max_tokens": 512})
 
 #if you want answers to generate faster, set the number of tokens above to a smaller number
 prompt = """What is cystic fibrosis?"""
@@ -105,17 +105,17 @@ displayHTML(llm(prompt))
 
 # COMMAND ----------
 
-"""
 
+'''
 import mlflow
 import pandas as pd
-loaded_model = mlflow.pyfunc.load_model(f"models:/mpt-7b-8k-instruct/latest")
+loaded_model = mlflow.pyfunc.load_model(f"models:/llama2-7b-MedText-QLoRA/latest")
 
 # Make a prediction using the loaded model
 input_example=pd.DataFrame({"prompt":["what is ML?", "Name 10 colors."], "temperature": [0.5, 0.2],"max_tokens": [100, 200]})
 print(loaded_model.predict(input_example))
 
-"""
+'''
 
 # COMMAND ----------
 
@@ -172,7 +172,7 @@ def answer_question(question):
   similar_docs = retriever.get_relevant_documents(question)
   result = qa_chain({"input_documents": similar_docs, "question": question})
   result_html = f"<p><blockquote style=\"font-size:24\">{question}</blockquote></p>"
-  result_html += f"<p><blockquote style=\"font-size:18px\">{result['output_text']}</blockquote></p>"
+  result_html += f"<p><blockquote style=\"font-size:18px\">{result['output_text'].split('### Response')[1].strip()}</blockquote></p>"
   result_html += "<p><hr/></p>"
   for d in result["input_documents"]:
     source_id = d.metadata["source"]
@@ -191,3 +191,7 @@ answer_question("What are the primary drugs for treating cystic fibrosis (CF)?")
 # COMMAND ----------
 
 answer_question("What are the cystic fibrosis drugs that target the CFTR protein?")
+
+# COMMAND ----------
+
+
