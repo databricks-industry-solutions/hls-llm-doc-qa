@@ -4,7 +4,7 @@
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## LLM Chain Creation
+# MAGIC ## Using an LLM Served on Databricks Model Serving: A LangChain app
 # MAGIC
 # MAGIC <img style="float: right" width="800px" src="https://raw.githubusercontent.com/databricks-industry-solutions/hls-llm-doc-qa/basic-qa-LLM-HLS/images/llm-chain.jpeg?token=GHSAT0AAAAAACBNXSB4UGOIIYZJ37LBI4MOZEBL4LQ">
 # MAGIC
@@ -21,11 +21,11 @@
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC Start with required libraries for data preparation. There is one library in particular, FlashAttention, that takes ~5 minutes to install, so this will take a little bit.
+# MAGIC Start with required libraries.
 
 # COMMAND ----------
 
-# MAGIC %run ./util/install-llm-libraries
+# MAGIC %run ./util/install-langchain-libraries
 
 # COMMAND ----------
 
@@ -34,8 +34,8 @@
 
 # COMMAND ----------
 
-# which LLM do you want to use? You can grab LLM names from Hugging Face and replace/add them here if you want
-dbutils.widgets.dropdown('model_name','mosaicml/mpt-7b-instruct',['databricks/dolly-v2-7b','tiiuae/falcon-7b-instruct','mosaicml/mpt-7b-instruct'])
+# which LLM do you want to use? Grab the name of the model you deployed in step 04 from Databricks Model Serving
+dbutils.widgets.text('model_name_from_model_serving',"llama2-7b-MedText-QLoRA")
 
 # which embeddings model from Hugging Face 🤗  you would like to use; for biomedical applications we have been using this model recently
 # also worth trying this model for embeddings for comparison: pritamdeka/BioBERT-mnli-snli-scinli-scitail-mednli-stsb
@@ -50,15 +50,9 @@ hf_cache_path = "/dbfs/tmp/cache/hf"
 # COMMAND ----------
 
 #get widget values
+model_name=dbutils.widgets.get('model_name_from_model_serving')
 db_persist_path = dbutils.widgets.get("Vectorstore_Persist_Path")
 embeddings_model = dbutils.widgets.get("Embeddings_Model")
-
-# COMMAND ----------
-
-import os
-# Optional, but helpful to avoid re-downloading the weights repeatedly. Set to any `/dbfs` path.
-os.environ['TRANSFORMERS_CACHE'] = hf_cache_path
-#os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:512"
 
 # COMMAND ----------
 
@@ -68,7 +62,7 @@ os.environ['TRANSFORMERS_CACHE'] = hf_cache_path
 # MAGIC Now we can compose the database with a language model and prompting strategy to make a `langchain` chain that answers questions.
 # MAGIC
 # MAGIC - Load the Chroma DB and define our retriever. We define `k` here, which is how many chunks of text we want to retrieve from the vectorstore to feed into the LLM
-# MAGIC - Instantiate an LLM, like Dolly here, but could be other models or even OpenAI models
+# MAGIC - Instantiate an LLM, loading from Databricks Model serving here, but could be other models or even OpenAI models
 # MAGIC - Define how relevant texts are combined with a question into the LLM prompt
 
 # COMMAND ----------
@@ -86,29 +80,51 @@ retriever = db.as_retriever(search_kwargs={"k": 4})
 
 # COMMAND ----------
 
-import transformers
-from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
-import torch
+# If running a Databricks notebook attached to an interactive cluster in "single user"
+# or "no isolation shared" mode, you only need to specify the endpoint name to create
+# a `Databricks` instance to query a serving endpoint in the same workspace.
+
+# Otherwise, you can manually specify the Databricks workspace hostname and personal access token
+# or set `DATABRICKS_HOST` and `DATABRICKS_TOKEN` environment variables, respectively.
+
+from langchain.llms import Databricks
+
+#llm = Databricks(endpoint_name=model_name)
+llm = Databricks(endpoint_name=model_name, model_kwargs={"temperature": 0.1,"max_new_tokens": 250})
+
+#if you want answers to generate faster, set the number of tokens above to a smaller number
+prompt = """What is cystic fibrosis?"""
+#sample question, if you want to try it out
+displayHTML(llm(prompt))
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC If you were not able to deploy to GPU serving in the previous step but you were able to register the model with MLflow, you can load the model from the registry using the below code. This will require you to run this notebook on a GPU cluster.
+# MAGIC
+
+# COMMAND ----------
+
+"""
+
+import mlflow
+import pandas as pd
+loaded_model = mlflow.pyfunc.load_model(f"models:/mpt-7b-8k-instruct/latest")
+
+# Make a prediction using the loaded model
+input_example=pd.DataFrame({"prompt":["what is ML?", "Name 10 colors."], "temperature": [0.5, 0.2],"max_tokens": [100, 200]})
+print(loaded_model.predict(input_example))
+
+"""
+
+# COMMAND ----------
+
 from langchain import PromptTemplate
-from langchain.llms import HuggingFacePipeline
 from langchain.chains.question_answering import load_qa_chain
 
 def build_qa_chain():
-  torch.cuda.empty_cache() # Not sure this is helping in all cases, but can free up a little GPU mem
-  model_name=dbutils.widgets.get('model_name') #selected from the dropdown widget at the top of the notebook
-
-  config = transformers.AutoConfig.from_pretrained(model_name, trust_remote_code=True)
   
-  if model_name == "mosaicml/mpt-7b-instruct":
-    tokenizer = AutoTokenizer.from_pretrained("EleutherAI/gpt-neox-20b") #for use with mpt-7b
-    config.attn_config['attn_impl'] = 'triton'
-    config.init_device = 'cuda:0' # For fast initialization directly on GPU!
-  else:
-    tokenizer = AutoTokenizer.from_pretrained(model_name) #for use with other models
-
-  model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.bfloat16, config=config, trust_remote_code=True)
-
-  template = """Below is an instruction that describes a task. Write a response that appropriately completes the request.
+  template = """You are a life sciences researcher with deep expertise in cystic fibrosis and related comorbidities. Below is an instruction that describes a task. Write a response that appropriately completes the request.
 
   ### Instruction:
   Use only information in the following paragraphs to answer the question. Explain the answer with reference to these paragraphs. If you don't know, say that you do not know.
@@ -121,21 +137,11 @@ def build_qa_chain():
   """
   prompt = PromptTemplate(input_variables=['context', 'question'], template=template)
 
-  end_key_token_id = tokenizer.encode("### End")[0]
-
-  # Increase max_new_tokens for a longer response
-  # Other settings might give better results! Play around
-  pipe = pipeline("text-generation", model=model, tokenizer=tokenizer, \
-    pad_token_id=tokenizer.pad_token_id, eos_token_id=end_key_token_id, \
-    do_sample=True, torch_dtype=torch.bfloat16, max_new_tokens=128, device=0) #remove device=0 when using Dolly/other newer models, use device_map=auto above instead
-
-  hf_pipe = HuggingFacePipeline(pipeline=pipe)
   # Set verbose=True to see the full prompt:
-  return load_qa_chain(llm=hf_pipe, chain_type="stuff", prompt=prompt)
+  return load_qa_chain(llm=llm, chain_type="stuff", prompt=prompt)
 
 # COMMAND ----------
 
-#this can take quite a while the first time you run this, as it must download the model from Hugging Face (can be many GB). These will be cached afterwards and get faster
 qa_chain = build_qa_chain()
 
 # COMMAND ----------

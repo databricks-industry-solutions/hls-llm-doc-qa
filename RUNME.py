@@ -76,7 +76,7 @@ job_json = {
             {
               "job_cluster_key": "hls_qa_cluster",
               "new_cluster": {
-                  "spark_version": "13.1.x-gpu-ml-scala2.12",
+                  "spark_version": "13.2.x-gpu-ml-scala2.12",
                   "num_workers": 1,
                   "node_type_id": {"AWS": "g5.4xlarge", "MSA": "Standard_NC4as_T4_v3", "GCP": "a2-highgpu-1g"}, 
                   "custom_tags": {
@@ -93,7 +93,3 @@ dbutils.widgets.dropdown("run_job", "False", ["True", "False"])
 run_job = dbutils.widgets.get("run_job") == "True"
 nsc = NotebookSolutionCompanion()
 nsc.deploy_compute(job_json, run_job=run_job)
-
-# COMMAND ----------
-
-
