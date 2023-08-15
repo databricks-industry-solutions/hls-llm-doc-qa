@@ -172,26 +172,13 @@ def answer_question(question):
   similar_docs = retriever.get_relevant_documents(question)
   result = qa_chain({"input_documents": similar_docs, "question": question})
   result_html = f"<p><blockquote style=\"font-size:24\">{question}</blockquote></p>"
-  #result_html += f"<p><blockquote style=\"font-size:18px\">{result['output_text']}</blockquote></p>" #depending on which prompt template you use, different response parsing might be needed
-  result_html += f"<p><blockquote style=\"font-size:18px\">{result['output_text'].split('### Response')[1].strip()}</blockquote></p>"
+  result_html += f"<p><blockquote style=\"font-size:18px\">{result['output_text']}</blockquote></p>" #depending on which prompt template you use, different response parsing might be needed - try the below if you get "IndexError: list index out of range"
+  #result_html += f"<p><blockquote style=\"font-size:18px\">{result['output_text'].split('### Response')[1].strip()}</blockquote></p>"
   result_html += "<p><hr/></p>"
   for d in result["input_documents"]:
     source_id = d.metadata["source"]
     result_html += f"<p><blockquote>{d.page_content}<br/>(Source: <a href=\"{source_id}\">{source_id}</a>)</blockquote></p>"
   displayHTML(result_html)
-
-# COMMAND ----------
-
-question = "What are the primary drugs for treating cystic fibrosis (CF)?"
-similar_docs = retriever.get_relevant_documents(question)
-result = qa_chain({"input_documents": similar_docs, "question": question})
-result_html = f"<p><blockquote style=\"font-size:24\">{question}</blockquote></p>"
-result_html += f"<p><blockquote style=\"font-size:18px\">{result['output_text'].split('### Response')[1].strip()}</blockquote></p>"
-result_html += "<p><hr/></p>"
-for d in result["input_documents"]:
-    source_id = d.metadata["source"]
-    result_html += f"<p><blockquote>{d.page_content}<br/>(Source: <a href=\"{source_id}\">{source_id}</a>)</blockquote></p>"
-displayHTML(result_html)
 
 # COMMAND ----------
 
