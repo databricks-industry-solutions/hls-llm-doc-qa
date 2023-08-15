@@ -35,7 +35,7 @@
 # COMMAND ----------
 
 # which LLM do you want to use? Grab the name of the model you deployed in step 04 from Databricks Model Serving
-dbutils.widgets.text('model_name_from_model_serving',"llama2-7b-MedText-QLoRA")
+dbutils.widgets.text('model_name_from_model_serving',"llama-2-7b-chat")
 
 # which embeddings model from Hugging Face 🤗  you would like to use; for biomedical applications we have been using this model recently
 # also worth trying this model for embeddings for comparison: pritamdeka/BioBERT-mnli-snli-scinli-scitail-mednli-stsb

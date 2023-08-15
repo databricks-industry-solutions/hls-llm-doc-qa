@@ -156,9 +156,9 @@ signature = ModelSignature(inputs=input_schema, outputs=output_schema)
 
 # Define input example
 input_example=pd.DataFrame({
-            "prompt":["what is ML?"], 
-            "temperature": [0.5],
-            "max_new_tokens": [100]})
+            "prompt":["what is cystic fibrosis (CF)?"], 
+            "temperature": [0.1],
+            "max_new_tokens": [75]})
 
 # Log the model with its details such as artifacts, pip requirements and input example
 # This may take about 1.7 minutes to complete
@@ -221,50 +221,84 @@ loaded_model.predict(
 
 # COMMAND ----------
 
+# MAGIC %md
+# MAGIC Retrieve model info from the previous step
+
+# COMMAND ----------
+
+#this should be the name of the registered model from the previous step
+model_name = 'llama-2-7b-chat'
+
 # Provide a name to the serving endpoint
-endpoint_name = 'llama2-7b-chat-mccall'
+endpoint_name = 'llama-2-7b-chat'
 
 # COMMAND ----------
 
-databricks_url = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiUrl().getOrElse(None)
-token = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().getOrElse(None)
+import mlflow
+from mlflow.tracking.client import MlflowClient
+client = MlflowClient
+
+def get_latest_model_version(model_name: str):
+  client = MlflowClient()
+  models = client.get_latest_versions(model_name, stages=["None"])
+  for m in models:
+    new_model_version = m.version
+  return new_model_version
+
+model_version = get_latest_model_version(model_name)
 
 # COMMAND ----------
 
-import requests
-import json
+# MAGIC %run ./util/create-update-serving-endpoint
 
-deploy_headers = {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
-deploy_url = f'{databricks_url}/api/2.0/serving-endpoints'
+# COMMAND ----------
 
-model_version = result  # the returned result of mlflow.register_model
-endpoint_config = {
-  "name": endpoint_name,
-  "config": {
-    "served_models": [{
-      "name": f'{model_version.name.replace(".", "_")}_{model_version.version}',
-      "model_name": model_version.name,
-      "model_version": model_version.version,
-      "workload_type": "GPU_MEDIUM",
+served_models = [
+    {
+      "name": model_name,
+      "model_name": model_name,
+      "model_version": model_version,
       "workload_size": "Small",
-      "scale_to_zero_enabled": "False"
-    }]
-  }
-}
-endpoint_json = json.dumps(endpoint_config, indent='  ')
+      "workload_type": "GPU_MEDIUM",
+      "scale_to_zero_enabled": False
+    }
+]
+traffic_config = {"routes": [{"served_model_name": model_name, "traffic_percentage": "100"}]}
 
-# Send a POST request to the API
-deploy_response = requests.request(method='POST', headers=deploy_headers, url=deploy_url, data=endpoint_json)
+# Create or update model serving endpoint
 
-if deploy_response.status_code != 200:
-  raise Exception(f'Request failed with status {deploy_response.status_code}, {deploy_response.text}')
+if not endpoint_exists(endpoint_name):
+  create_endpoint(endpoint_name, served_models)
+else:
+  update_endpoint(endpoint_name, served_models)
 
-# Show the response of the POST request
-# When first creating the serving endpoint, it should show that the state 'ready' is 'NOT_READY'
-# You can check the status on the Databricks model serving endpoint page, it is expected to take ~35 min for the serving endpoint to become ready
-print(deploy_response.json())
+# COMMAND ----------
+
+# MAGIC %md 
+# MAGIC (Optional) Use the SDK instead of the API Above
+
+# COMMAND ----------
+
+# from databricks.sdk import WorkspaceClient
+# from databricks.sdk.service.serving import *
+# from datetime import timedelta
+# w = WorkspaceClient()
+# served_models = [ServedModelInput(model_name=model_name, 
+#                                   model_version=model_version, 
+#                                   workload_size='Small',
+#                                   workload_type='GPU_MEDIUM', # additional param for GPU serving 
+#                                   scale_to_zero_enabled='False')]
+
+# try:
+#   w.serving_endpoints.create_and_wait(name=endpoint_name, 
+#                                      config=EndpointCoreConfigInput(served_models=served_models), 
+#                                      timeout=timedelta(minutes=40)) # extending timeout for GPU serving; default is 20
+# except: # when the endpoint already exists, update it
+#   w.serving_endpoints.update_config_and_wait(name=endpoint_name, 
+#                                              served_models=served_models, 
+#                                              timeout=timedelta(minutes=40))
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC Once the model serving endpoint is ready, you can query it easily with LangChain (see `05-LLM-Chain-with-GPU-Serving` for example code) running in the same workspace.
+# MAGIC Once the model serving endpoint is ready, you can query it easily with LangChain (see `04-LLM-Chain-with-GPU-Serving` for example code) running in the same workspace.
