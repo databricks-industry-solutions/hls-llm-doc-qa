@@ -62,12 +62,48 @@ job_json = {
             {
                 "job_cluster_key": "hls_qa_cluster",
                 "notebook_task": {
-                    "notebook_path": f"03-LLM-Chain-and-Question-Answering"
+                    "notebook_path": f"03_Fine_Tune_Llama2_QLoRA"
                 },
-                "task_key": "QA",
+                "task_key": "Finetune",
                 "depends_on": [
                     {
                         "task_key": "Data-prep"
+                    }
+                ]
+            },
+            {
+                "job_cluster_key": "hls_qa_cluster",
+                "notebook_task": {
+                    "notebook_path": f"04-Deploy-Llama-2-MedText-to-GPU-Serving"
+                },
+                "task_key": "Deploy",
+                "depends_on": [
+                    {
+                        "task_key": "Finetune"
+                    }
+                ]
+            },
+            {
+                "job_cluster_key": "hls_qa_cluster",
+                "notebook_task": {
+                    "notebook_path": f"05-LLM-Chain-with-GPU-Serving"
+                },
+                "task_key": "LLM-Chain",
+                "depends_on": [
+                    {
+                        "task_key": "Deploy"
+                    }
+                ]
+            },
+            {
+                "job_cluster_key": "hls_qa_cluster",
+                "notebook_task": {
+                    "notebook_path": f"06-[Optional]-Deploy-Base-Llama-2-to-GPU-Serving"
+                },
+                "task_key": "Deploy-base-llama-2",
+                "depends_on": [
+                    {
+                        "task_key": "LLM-Chain"
                     }
                 ]
             }
@@ -76,7 +112,7 @@ job_json = {
             {
               "job_cluster_key": "hls_qa_cluster",
               "new_cluster": {
-                  "spark_version": "13.1.x-gpu-ml-scala2.12",
+                  "spark_version": "13.2.x-gpu-ml-scala2.12",
                   "num_workers": 1,
                   "node_type_id": {"AWS": "g5.4xlarge", "MSA": "Standard_NC4as_T4_v3", "GCP": "a2-highgpu-1g"}, 
                   "custom_tags": {
@@ -93,7 +129,3 @@ dbutils.widgets.dropdown("run_job", "False", ["True", "False"])
 run_job = dbutils.widgets.get("run_job") == "True"
 nsc = NotebookSolutionCompanion()
 nsc.deploy_compute(job_json, run_job=run_job)
-
-# COMMAND ----------
-
-
