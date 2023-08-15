@@ -16,6 +16,12 @@
 # MAGIC
 # MAGIC We will leverage PEFT library from Hugging Face ecosystem, as well as QLoRA for more memory efficient finetuning. Per the [MedText HuggingFace page](https://huggingface.co/datasets/BI55/MedText): 
 # MAGIC "This is a medical diagnosis dataset containing over 1000 top notch textbook quality patient presentations and diagnosis/treatments. The 100 most common diseases and the 30 most common injuries people go to the hospital with, are, among others, fully captured in the dataset, with multiple datapoints for each ranging from mild to complicated to severe. Full list below. The dataset also contains completions about the nature of the AI itself, that it never can replace a doctor and always emphasizes to go to a professional and some nonsensical or doubtful presentations. A model trained on this dataset explicitly tells when it CANNOT answer with confidence or if the presentation is insufficient. This is to prevent hallucinations."
+# MAGIC
+# MAGIC Requirements:
+# MAGIC - To get the access to the model on HuggingFace, please visit the [Meta website](https://ai.meta.com/resources/models-and-libraries/llama-downloads) and accept the license terms and acceptable use policy before submitting this form. Requests will be processed in 1-2 days.
+# MAGIC - Have a Hugging Face account (with the same email address you entered in Meta’s form).
+# MAGIC - Have a Hugging Face token.
+# MAGIC - Visit the page of one of the LLaMA 2 available models (version [7B](https://huggingface.co/meta-llama/Llama-2-7b-hf), [13B](https://huggingface.co/meta-llama/Llama-2-13b-hf) or [70B](https://huggingface.co/meta-llama/Llama-2-70b-hf)), and accept Hugging Face’s license terms and acceptable use policy.
 
 # COMMAND ----------
 
@@ -130,6 +136,7 @@ revision = "0ede8dd71e923db6258295621d817ca8714516d4"
 
 tokenizer = AutoTokenizer.from_pretrained(model, trust_remote_code=True)
 tokenizer.pad_token = tokenizer.eos_token
+tokenizer.add_eos_token = True
 
 bnb_config = BitsAndBytesConfig(
     load_in_4bit=True,
@@ -156,27 +163,11 @@ model.config.use_cache = False
 
 # COMMAND ----------
 
-def print_trainable_parameters(model):
-    """
-    Prints the number of trainable parameters in the model.
-    """
-    trainable_params = 0
-    all_param = 0
-    for _, param in model.named_parameters():
-        all_param += param.numel()
-        if param.requires_grad:
-            trainable_params += param.numel()
-    print(
-        f"trainable params: {trainable_params} || all params: {all_param} || trainable%: {100 * trainable_params / all_param}"
-    )
-
-# COMMAND ----------
-
 from peft import LoraConfig, get_peft_model
 
-lora_alpha = 16
-lora_dropout = 0.1
-lora_r = 64
+lora_alpha = 16 # parameter for scaling
+lora_dropout = 0.1 # dropout probability for layers
+lora_r = 64 # dimension of the updated matrices
 
 peft_config = LoraConfig(
     lora_alpha=lora_alpha,
@@ -186,11 +177,6 @@ peft_config = LoraConfig(
     task_type="CAUSAL_LM",
     target_modules=['q_proj', 'o_proj', 'gate_proj', 'up_proj', 'down_proj', 'k_proj', 'v_proj'] # Choose all linear layers from the model
 )
-
-# COMMAND ----------
-
-#model = get_peft_model(model, peft_config)
-#print_trainable_parameters(model)
 
 # COMMAND ----------
 
@@ -244,7 +230,7 @@ training_arguments = TrainingArguments(
 
 from trl import SFTTrainer
 
-max_seq_length = 2048 #can make shorter if needed
+max_seq_length = 512 #can make shorter if needed
 
 trainer = SFTTrainer(
     model=model,
@@ -391,7 +377,7 @@ import pandas as pd
 
 prompt = """Below is an instruction that describes a task. Write a response that appropriately completes the request.
 ### Instruction:
-if one get corona and you are self isolating and it is not severe, is there any meds that one can take?
+What is the proper course of response if you are diagnosed with coronaviraus?
 
 ### Response: """
 # Load model as a PyFuncModel.
@@ -410,6 +396,10 @@ loaded_model.predict(text_example)
 
 # COMMAND ----------
 
+displayHTML(loaded_model.predict(text_example))
+
+# COMMAND ----------
+
 # MAGIC %md
 # MAGIC ### Register the model
 
@@ -422,11 +412,3 @@ result = mlflow.register_model(
     name="Llama-2-7b-MedText-QLoRa",
     await_registration_for=1000,
 )
-
-# COMMAND ----------
-
-print(result)
-
-# COMMAND ----------
-
-

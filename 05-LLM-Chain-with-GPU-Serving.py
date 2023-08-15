@@ -30,7 +30,7 @@
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC Creating a dropdown widget for model selection, as well as defining the file paths where our PDFs are stored, where we want to cache the HuggingFace model downloads, and where we want to persist our vectorstore.
+# MAGIC Creating a dropdown widget for model selection from the previous step, as well as defining where our vectorstore was persisted and which embeddings model we want to use.
 
 # COMMAND ----------
 
@@ -76,7 +76,7 @@ hf_embed = HuggingFaceEmbeddings(model_name=embeddings_model)
 db = Chroma(collection_name="hls_docs", embedding_function=hf_embed, persist_directory=db_persist_path)
 
 #k here is a particularly important parameter; this is how many chunks of text we want to retrieve from the vectorstore
-retriever = db.as_retriever(search_kwargs={"k": 4})
+retriever = db.as_retriever(search_kwargs={"k": 3})
 
 # COMMAND ----------
 
@@ -93,7 +93,7 @@ from langchain.llms import Databricks
 llm = Databricks(endpoint_name=model_name, model_kwargs={"temperature": 0.1,"max_tokens": 512})
 
 #if you want answers to generate faster, set the number of tokens above to a smaller number
-prompt = """What is cystic fibrosis?"""
+prompt = "What is cystic fibrosis?"
 #sample question, if you want to try it out
 displayHTML(llm(prompt))
 
@@ -172,12 +172,26 @@ def answer_question(question):
   similar_docs = retriever.get_relevant_documents(question)
   result = qa_chain({"input_documents": similar_docs, "question": question})
   result_html = f"<p><blockquote style=\"font-size:24\">{question}</blockquote></p>"
+  #result_html += f"<p><blockquote style=\"font-size:18px\">{result['output_text']}</blockquote></p>" #depending on which prompt template you use, different response parsing might be needed
   result_html += f"<p><blockquote style=\"font-size:18px\">{result['output_text'].split('### Response')[1].strip()}</blockquote></p>"
   result_html += "<p><hr/></p>"
   for d in result["input_documents"]:
     source_id = d.metadata["source"]
     result_html += f"<p><blockquote>{d.page_content}<br/>(Source: <a href=\"{source_id}\">{source_id}</a>)</blockquote></p>"
   displayHTML(result_html)
+
+# COMMAND ----------
+
+question = "What are the primary drugs for treating cystic fibrosis (CF)?"
+similar_docs = retriever.get_relevant_documents(question)
+result = qa_chain({"input_documents": similar_docs, "question": question})
+result_html = f"<p><blockquote style=\"font-size:24\">{question}</blockquote></p>"
+result_html += f"<p><blockquote style=\"font-size:18px\">{result['output_text'].split('### Response')[1].strip()}</blockquote></p>"
+result_html += "<p><hr/></p>"
+for d in result["input_documents"]:
+    source_id = d.metadata["source"]
+    result_html += f"<p><blockquote>{d.page_content}<br/>(Source: <a href=\"{source_id}\">{source_id}</a>)</blockquote></p>"
+displayHTML(result_html)
 
 # COMMAND ----------
 

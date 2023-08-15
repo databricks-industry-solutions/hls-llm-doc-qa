@@ -15,7 +15,12 @@
 # MAGIC GPU instances that have at least 16GB GPU memory would be enough for inference on single input (batch inference requires slightly more memory). On Azure, it is possible to use `Standard_NC6s_v3` or `Standard_NC4as_T4_v3`.
 # MAGIC
 # MAGIC requirements:
-# MAGIC - To get the access of the model on HuggingFace, please visit the [Meta website](https://ai.meta.com/resources/models-and-libraries/llama-downloads) and accept our license terms and acceptable use policy before submitting this form. Requests will be processed in 1-2 days.
+# MAGIC - To get the access to the model on HuggingFace, please visit the [Meta website](https://ai.meta.com/resources/models-and-libraries/llama-downloads) and accept the license terms and acceptable use policy before submitting this form. Requests will be processed in 1-2 days.
+
+# COMMAND ----------
+
+# MAGIC %pip install mlflow databricks-sdk==0.3.0 # remove mlflow 
+# MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
 
@@ -26,6 +31,9 @@
 
 #this should be the name of the registered model from the previous step
 model_name = 'Llama-2-7b-MedText-QLoRa'
+
+# Provide a name to the serving endpoint
+endpoint_name = 'llama2-7b-MedText-QLoRA'
 
 # COMMAND ----------
 
@@ -41,7 +49,7 @@ def get_latest_model_version(model_name: str):
     new_model_version = m.version
   return new_model_version
 
-  model_version = get_latest_model_version(model_name)
+model_version = get_latest_model_version(model_name)
 
 # COMMAND ----------
 
@@ -51,46 +59,86 @@ def get_latest_model_version(model_name: str):
 
 # COMMAND ----------
 
-# Provide a name to the serving endpoint
-endpoint_name = 'llama2-7b-MedText-QLoRA'
+# databricks_url = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiUrl().getOrElse(None)
+# token = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().getOrElse(None)
+# import requests
+# import json
+
+# deploy_headers = {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
+# deploy_url = f'{databricks_url}/api/2.0/serving-endpoints'
+
+# endpoint_config = {
+#   "name": endpoint_name,
+#   "config": {
+#     "served_models": [{
+#       "model_name": model_name,
+#       "model_version": model_version,
+#       "workload_type": "GPU_MEDIUM",
+#       "workload_size": "Small",
+#       "scale_to_zero_enabled": "False"
+#     }]
+#   }
+# }
+# endpoint_json = json.dumps(endpoint_config, indent='  ')
+
+# # Send a POST request to the API
+# deploy_response = requests.request(method='POST', headers=deploy_headers, url=deploy_url, data=endpoint_json)
+
+# if deploy_response.status_code != 200:
+#   raise Exception(f'Request failed with status {deploy_response.status_code}, {deploy_response.text}')
+
+# # Show the response of the POST request
+# # When first creating the serving endpoint, it should show that the state 'ready' is 'NOT_READY'
+# # You can check the status on the Databricks model serving endpoint page, it is expected to take ~35 min for the serving endpoint to become ready
+# print(deploy_response.json())
 
 # COMMAND ----------
 
-databricks_url = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiUrl().getOrElse(None)
-token = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().getOrElse(None)
+# DBTITLE 1,Robust API
+# MAGIC %run ./util/create-update-serving-endpoint
 
 # COMMAND ----------
 
-import requests
-import json
-
-deploy_headers = {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
-deploy_url = f'{databricks_url}/api/2.0/serving-endpoints'
-
-endpoint_config = {
-  "name": endpoint_name,
-  "config": {
-    "served_models": [{
+served_models = [
+    {
+      "name": model_name,
       "model_name": model_name,
       "model_version": model_version,
-      "workload_type": "GPU_MEDIUM",
       "workload_size": "Small",
-      "scale_to_zero_enabled": "False"
-    }]
-  }
-}
-endpoint_json = json.dumps(endpoint_config, indent='  ')
+      "workload_type": "GPU_MEDIUM",
+      "scale_to_zero_enabled": False
+    }
+]
+traffic_config = {"routes": [{"served_model_name": model_name, "traffic_percentage": "100"}]}
 
-# Send a POST request to the API
-deploy_response = requests.request(method='POST', headers=deploy_headers, url=deploy_url, data=endpoint_json)
+# Create or update model serving endpoint
 
-if deploy_response.status_code != 200:
-  raise Exception(f'Request failed with status {deploy_response.status_code}, {deploy_response.text}')
+if not endpoint_exists(endpoint_name):
+  create_endpoint(endpoint_name, served_models)
+else:
+  update_endpoint(endpoint_name, served_models)
 
-# Show the response of the POST request
-# When first creating the serving endpoint, it should show that the state 'ready' is 'NOT_READY'
-# You can check the status on the Databricks model serving endpoint page, it is expected to take ~35 min for the serving endpoint to become ready
-print(deploy_response.json())
+# COMMAND ----------
+
+# DBTITLE 1,SDK
+# from databricks.sdk import WorkspaceClient
+# from databricks.sdk.service.serving import *
+# from datetime import timedelta
+# w = WorkspaceClient()
+# served_models = [ServedModelInput(model_name=model_name, 
+#                                   model_version=model_version, 
+#                                   workload_size='Small',
+#                                   workload_type='GPU_MEDIUM', # additional param for GPU serving 
+#                                   scale_to_zero_enabled='False')]
+
+# try:
+#   w.serving_endpoints.create_and_wait(name=endpoint_name, 
+#                                      config=EndpointCoreConfigInput(served_models=served_models), 
+#                                      timeout=timedelta(minutes=40)) # extending timeout for GPU serving; default is 20
+# except: # when the endpoint already exists, update it
+#   w.serving_endpoints.update_config_and_wait(name=endpoint_name, 
+#                                              served_models=served_models, 
+#                                              timeout=timedelta(minutes=40))
 
 # COMMAND ----------
 
