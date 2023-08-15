@@ -12,7 +12,7 @@ ___
 
 ___
 
-<img style="margin: auto; display: block" width="1200px" src="https://raw.githubusercontent.com/databricks-industry-solutions/hls-llm-doc-qa/basic-qa-LLM-HLS/images/solution-overview.jpeg?token=GHSAT0AAAAAACBNXSB43DCNDGVDBWWEWHZCZEBLWBA">
+<img style="margin: auto; display: block" width="1200px" src="https://raw.githubusercontent.com/databricks-industry-solutions/hls-llm-doc-qa/hls-llm-qa-gpu/images/solution-overview.jpeg">
 
 ___
 
