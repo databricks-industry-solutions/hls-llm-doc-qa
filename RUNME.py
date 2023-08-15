@@ -25,10 +25,32 @@
 
 # DBTITLE 0,Install util packages
 # MAGIC %pip install git+https://github.com/databricks-academy/dbacademy@v1.0.13 git+https://github.com/databricks-industry-solutions/notebook-solution-companion@safe-print-html --quiet --disable-pip-version-check
+# MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
 
 from solacc.companion import NotebookSolutionCompanion
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC Before setting up the rest of the accelerator, we need set up a few credentials. Grab a personal access token for your Huggingface account ([documentation](https://huggingface.co/settings/token)). Here we demonstrate using the [Databricks Secret Scope](https://docs.databricks.com/security/secrets/secret-scopes.html) for credential management. 
+# MAGIC
+# MAGIC Copy the block of code below, replace the name the secret scope and fill in the credentials and execute the block. After executing the code, the accelerator notebook will be able to access the credentials it needs.
+# MAGIC
+# MAGIC
+# MAGIC ```
+# MAGIC client = NotebookSolutionCompanion().client
+# MAGIC try:
+# MAGIC   client.execute_post_json(f"{client.endpoint}/api/2.0/secrets/scopes/create", {"scope": "solution-accelerator-cicd"})
+# MAGIC except:
+# MAGIC   pass
+# MAGIC client.execute_post_json(f"{client.endpoint}/api/2.0/secrets/put", {
+# MAGIC   "scope": "solution-accelerator-cicd",
+# MAGIC   "key": "huggingface",
+# MAGIC   "string_value": "____"
+# MAGIC })
+# MAGIC ```
 
 # COMMAND ----------
 
@@ -37,7 +59,7 @@ job_json = {
         "max_concurrent_runs": 1,
         "tags": {
             "usage": "solacc_testing",
-            "group": "SOLACC"
+            "group": "HLS"
         },
         "tasks": [
             {
@@ -62,7 +84,7 @@ job_json = {
             {
                 "job_cluster_key": "hls_qa_cluster",
                 "notebook_task": {
-                    "notebook_path": f"03_Fine_Tune_Llama2_QLoRA"
+                    "notebook_path": f"03-Deploy-Llama-2-to-GPU-Serving"
                 },
                 "task_key": "Finetune",
                 "depends_on": [
@@ -74,36 +96,12 @@ job_json = {
             {
                 "job_cluster_key": "hls_qa_cluster",
                 "notebook_task": {
-                    "notebook_path": f"04-Deploy-Llama-2-MedText-to-GPU-Serving"
+                    "notebook_path": f"04-LLM-Chain-with-GPU-Serving"
                 },
                 "task_key": "Deploy",
                 "depends_on": [
                     {
                         "task_key": "Finetune"
-                    }
-                ]
-            },
-            {
-                "job_cluster_key": "hls_qa_cluster",
-                "notebook_task": {
-                    "notebook_path": f"05-LLM-Chain-with-GPU-Serving"
-                },
-                "task_key": "LLM-Chain",
-                "depends_on": [
-                    {
-                        "task_key": "Deploy"
-                    }
-                ]
-            },
-            {
-                "job_cluster_key": "hls_qa_cluster",
-                "notebook_task": {
-                    "notebook_path": f"06-[Optional]-Deploy-Base-Llama-2-to-GPU-Serving"
-                },
-                "task_key": "Deploy-base-llama-2",
-                "depends_on": [
-                    {
-                        "task_key": "LLM-Chain"
                     }
                 ]
             }

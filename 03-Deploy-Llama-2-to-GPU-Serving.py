@@ -25,10 +25,10 @@
 
 # COMMAND ----------
 
-from huggingface_hub import notebook_login
+from huggingface_hub import login
 
 # Login to Huggingface to get access to the model if you use the official version of Llama 2
-notebook_login()
+login(token=dbutils.secrets.get('solution-accelerator-cicd', 'huggingface'))
 
 # COMMAND ----------
 
