@@ -64,6 +64,10 @@ import mlflow
 import torch
 import transformers
 
+# Set mlflow experiment to the user's workspace folder - this enables this notebook to run as part of a job
+username = dbutils.notebook.entry_point.getDbutils().notebook().getContext().userName().get()
+mlflow.set_experiment('/Users/{}/hls-llm-doc-qa'.format(username))
+
 # Define prompt template to get the expected features and performance for the chat versions. See our reference code in github for details: https://github.com/facebookresearch/llama/blob/main/llama/generation.py#L212
 
 DEFAULT_SYSTEM_PROMPT = """\
