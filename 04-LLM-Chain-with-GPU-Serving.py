@@ -86,11 +86,16 @@ retriever = db.as_retriever(search_kwargs={"k": 3})
 
 # Otherwise, you can manually specify the Databricks workspace hostname and personal access token
 # or set `DATABRICKS_HOST` and `DATABRICKS_TOKEN` environment variables, respectively.
+# You can set those environment variables based on the notebook context if run on Databricks
 
+import os
 from langchain.llms import Databricks
 
+os.environ['DATABRICKS_URL'] = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiUrl().getOrElse(None) 
+os.environ['DATABRICKS_TOKEN'] = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().getOrElse(None)
+
 #llm = Databricks(endpoint_name=model_name)
-llm = Databricks(endpoint_name=model_name, model_kwargs={"temperature": 0.1,"max_tokens": 512})
+llm = Databricks(endpoint_name=model_name, model_kwargs={"temperature": 0.1,"max_new_tokens": 512})
 
 #if you want answers to generate faster, set the number of tokens above to a smaller number
 prompt = "What is cystic fibrosis?"
