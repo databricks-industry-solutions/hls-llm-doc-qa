@@ -19,7 +19,7 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install mlflow databricks-sdk==0.3.0 # remove mlflow 
+# MAGIC %pip install mlflow databricks-sdk==0.3.0 # update mlflow 
 # MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
