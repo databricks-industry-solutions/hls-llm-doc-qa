@@ -50,7 +50,7 @@ hf_cache_path = "/dbfs/tmp/cache/hf"
 # COMMAND ----------
 
 #get widget values
-model_name=dbutils.widgets.get('model_name_from_model_serving')
+model_name= dbutils.widgets.get('model_name_from_model_serving')
 db_persist_path = dbutils.widgets.get("Vectorstore_Persist_Path")
 embeddings_model = dbutils.widgets.get("Embeddings_Model")
 

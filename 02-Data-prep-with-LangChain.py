@@ -46,6 +46,14 @@ dbutils.widgets.text("Vectorstore_Persist_Path", "/dbfs/tmp/langchain_hls/db")
 # publicly accessible bucket with PDFs for this demo
 dbutils.widgets.text("Source_Documents", "s3a://db-gtm-industry-solutions/data/hls/llm_qa/")
 
+
+# Vector Search Endpoint Name 
+dbutils.widgets.text("Vector_Search_Endpoint", "hls_llm_qa_demo_vse")
+
+# Vector Index Name 
+dbutils.widgets.text("Vector_Index", "hls_llm_qa_demo_ws.vse.hls_llm_qa_hf_embeddings")
+
+
 # where you want the Hugging Face models to be temporarily saved
 hf_cache_path = "/dbfs/tmp/cache/hf"
 
@@ -56,6 +64,8 @@ pdf_path = dbutils.widgets.get("PDF_Path")
 source_pdfs = dbutils.widgets.get("Source_Documents")
 db_persist_path = dbutils.widgets.get("Vectorstore_Persist_Path")
 embeddings_model = dbutils.widgets.get("Embeddings_Model")
+vector_search_endpoint_name = dbutils.widgets.get("Vector_Search_Endpoint")
+vector_index_name = dbutils.widgets.get("Vector_Index")
 
 # COMMAND ----------
 
@@ -161,13 +171,87 @@ display(documents)
 
 # COMMAND ----------
 
-from langchain.embeddings import HuggingFaceEmbeddings
-from langchain.vectorstores import Chroma
+# MAGIC %md
+# MAGIC Now that we split the documents into more manageable chunks. We will now set up **Databricks Vector Search** with a **Direct Vector Access Index** which will be used with Langchain in our RAG architecture. 
+# MAGIC - We first need to create a dataframe with an id column to be used with Vector Search.
+# MAGIC - We will then calculate the embeddings using HuggingFaceEmbeddgins
+# MAGIC - Finally we will save this in our Vector Search as an index to be used for RAG.
 
-hf_embed = HuggingFaceEmbeddings(model_name=embeddings_model)
-sample_query = "What is cystic fibrosis?"
-db = Chroma.from_documents(collection_name="hls_docs", documents=documents, embedding=hf_embed, persist_directory=db_persist_path)
-db.persist()
+# COMMAND ----------
+
+from databricks.vector_search.client import VectorSearchClient
+
+# Automatically generates a PAT Token for authentication
+client = VectorSearchClient()
+
+# Uses the service principal token for authentication
+# client = VectorSearch(service_principal_client_id=<CLIENT_ID>,service_principal_client_secret=<CLIENT_SECRET>)
+
+# client.create_endpoint(
+#     name= vector_search_endpoint_name,
+#     endpoint_type="STANDARD"
+# )
+
+# COMMAND ----------
+
+from pyspark.sql.functions import col, monotonically_increasing_id
+
+# add id for the primary key for the vector search index. Also cast metadata to string instead of map<string, string> which is incompatible with vector search 
+documents_with_id = spark.createDataFrame(documents).withColumn("metadata", col("metadata").cast("string")).withColumn("id", monotonically_increasing_id())
+
+# Write the dataframe to Unity Catalog to be used as source table
+# documents_with_id.write.option("mergeSchema", "true").mode("overwrite").format("delta").saveAsTable("hls_llm_qa_demo_ws.vse.hls_llm_qa_raw_docs")
+
+# display(documents_with_id)
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC ALTER TABLE hls_llm_qa_demo_ws.vse.hls_llm_qa_raw_docs SET TBLPROPERTIES (delta.enableChangeDataFeed = true)
+
+# COMMAND ----------
+
+# MAGIC %md 
+# MAGIC
+# MAGIC #TODO 
+# MAGIC
+# MAGIC - Confirm embedding dimension
+# MAGIC - index requires a UC target to save 
+# MAGIC - 
+
+# COMMAND ----------
+
+index = client.create_delta_sync_index(
+  endpoint_name= vector_search_endpoint_name,
+  source_table_name= "hls_llm_qa_demo_ws.vse.hls_llm_qa_raw_docs",
+  index_name= vector_index_name,
+  pipeline_type='TRIGGERED',
+  primary_key="id",
+  embedding_source_column= "page_content",
+  embedding_model_endpoint_name="databricks-bge-large-en" 
+)
+
+# COMMAND ----------
+
+# DBTITLE 1,Load index using the Vector Search Client
+from databricks.vector_search.client import VectorSearchClient
+vsc = VectorSearchClient()
+
+vs_index = vsc.get_index(endpoint_name= vector_search_endpoint_name, index_name= vector_index_name)
+
+vs_index.describe()
+
+# COMMAND ----------
+
+# DBTITLE 1,Use similarity search to test the index
+results = vs_index.similarity_search(
+    query_text="What is cystic fibrosis?",
+    columns=["id"
+             , "page_content"],
+    num_results=2
+    )
+
+display(results)
 
 # COMMAND ----------
 
@@ -182,10 +266,27 @@ db.persist()
 
 # COMMAND ----------
 
-# Start here to load a previously-saved DB
-from langchain.embeddings import HuggingFaceEmbeddings
-from langchain.vectorstores import Chroma
+# DBTITLE 1,Use Vector Search Client to create a function to use as retriever for QA chain
+from langchain.vectorstores import DatabricksVectorSearch
+from langchain.embeddings import DatabricksEmbeddings
 
-db_persist_path = db_persist_path
-hf_embed = HuggingFaceEmbeddings(model_name=embeddings_model)
-db = Chroma(collection_name="hls_docs", embedding_function=hf_embed, persist_directory=db_persist_path)
+
+def get_retriever(persist_dir: str = None):
+    
+    vs_index = vsc.get_index(
+        endpoint_name= vector_search_endpoint_name,
+        index_name= vector_index_name
+    )
+
+    # Create the retriever
+    vectorstore = DatabricksVectorSearch(
+        vs_index, text_column="page_content"
+    )
+    return vectorstore.as_retriever()
+
+
+# test our retriever
+vectorstore = get_retriever()
+
+similar_documents = vectorstore.get_relevant_documents("What is cystic fibrosis?")
+print(f"Relevant documents: {similar_documents[0]}")
