@@ -306,3 +306,7 @@ else:
 
 # MAGIC %md
 # MAGIC Once the model serving endpoint is ready, you can query it easily with LangChain (see `04-LLM-Chain-with-GPU-Serving` for example code) running in the same workspace.
+
+# COMMAND ----------
+
+

@@ -47,12 +47,25 @@ dbutils.widgets.text("Vectorstore_Persist_Path", "/dbfs/tmp/langchain_hls/db")
 # where you want the Hugging Face models to be temporarily saved
 hf_cache_path = "/dbfs/tmp/cache/hf"
 
+# Location for the split documents to be saved  
+dbutils.widgets.text("Persisted_UC_Table_Location", "hls_llm_qa_demo_ws.vse.hls_llm_qa_raw_docs")
+
+# Vector Search Endpoint Name 
+dbutils.widgets.text("Vector_Search_Endpoint", "hls_llm_qa_demo_vse")
+
+# Vector Index Name 
+dbutils.widgets.text("Vector_Index", "hls_llm_qa_demo_ws.vse.hls_llm_qa_hf_embeddings")
+
 # COMMAND ----------
 
 #get widget values
 model_name= dbutils.widgets.get('model_name_from_model_serving')
 db_persist_path = dbutils.widgets.get("Vectorstore_Persist_Path")
 embeddings_model = dbutils.widgets.get("Embeddings_Model")
+
+vector_search_endpoint_name = dbutils.widgets.get("Vector_Search_Endpoint")
+vector_index_name = dbutils.widgets.get("Vector_Index")
+UC_table_save_location = dbutils.widgets.get("Persisted_UC_Table_Location")
 
 # COMMAND ----------
 
@@ -61,22 +74,41 @@ embeddings_model = dbutils.widgets.get("Embeddings_Model")
 # MAGIC
 # MAGIC Now we can compose the database with a language model and prompting strategy to make a `langchain` chain that answers questions.
 # MAGIC
-# MAGIC - Load the Chroma DB and define our retriever. We define `k` here, which is how many chunks of text we want to retrieve from the vectorstore to feed into the LLM
+# MAGIC - Load Databricks Vector Search and define our retriever. We define `k` here, which is how many chunks of text we want to retrieve from the vectorstore to feed into the LLM
 # MAGIC - Instantiate an LLM, loading from Databricks Model serving here, but could be other models or even OpenAI models
 # MAGIC - Define how relevant texts are combined with a question into the LLM prompt
 
 # COMMAND ----------
 
-# Start here to load a previously-saved DB
-from langchain.embeddings import HuggingFaceEmbeddings
-from langchain.vectorstores import Chroma
+from databricks.vector_search.client import VectorSearchClient
+vsc = VectorSearchClient()
 
-db_persist_path = db_persist_path
-hf_embed = HuggingFaceEmbeddings(model_name=embeddings_model)
-db = Chroma(collection_name="hls_docs", embedding_function=hf_embed, persist_directory=db_persist_path)
+vs_index = vsc.get_index(endpoint_name= vector_search_endpoint_name, index_name= vector_index_name)
 
-#k here is a particularly important parameter; this is how many chunks of text we want to retrieve from the vectorstore
-retriever = db.as_retriever(search_kwargs={"k": 3})
+vs_index.describe()
+
+# COMMAND ----------
+
+from langchain.vectorstores import DatabricksVectorSearch
+from langchain.embeddings import DatabricksEmbeddings
+
+
+def get_retriever(persist_dir: str = None):
+    
+    vs_index = vsc.get_index(
+        endpoint_name= vector_search_endpoint_name,
+        index_name= vector_index_name
+    )
+
+    # Create the retriever
+    vectorstore = DatabricksVectorSearch(
+        vs_index, text_column="page_content"
+    )
+    return vectorstore.as_retriever()
+
+
+# test our retriever
+retriever = get_retriever()
 
 # COMMAND ----------
 
@@ -94,8 +126,11 @@ from langchain.llms import Databricks
 os.environ['DATABRICKS_URL'] = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiUrl().getOrElse(None) 
 os.environ['DATABRICKS_TOKEN'] = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().getOrElse(None)
 
-#llm = Databricks(endpoint_name=model_name)
-llm = Databricks(endpoint_name=model_name, model_kwargs={"temperature": 0.1,"max_new_tokens": 512})
+llm = Databricks(endpoint_name=model_name)
+# llm = Databricks(endpoint_name=model_name, model_kwargs={"temperature": 0.1, "max_new_tokens": 512})
+# This is giving following error: ValueError: Cannot set both extra_params and extra_params. 
+#  441 if self.model_kwargs is not None and self.extra_params is not None:
+
 
 #if you want answers to generate faster, set the number of tokens above to a smaller number
 prompt = "What is cystic fibrosis?"
@@ -124,8 +159,9 @@ print(loaded_model.predict(input_example))
 
 # COMMAND ----------
 
+# DBTITLE 1,Build the QA Chain using Vector Search as the retreiver
 from langchain import PromptTemplate
-from langchain.chains.question_answering import load_qa_chain
+from langchain.chains import RetrievalQA
 
 def build_qa_chain():
   
@@ -142,12 +178,19 @@ def build_qa_chain():
   """
   prompt = PromptTemplate(input_variables=['context', 'question'], template=template)
 
+  qa_chain = RetrievalQA.from_chain_type(
+    llm=llm,
+    chain_type="stuff",
+    retriever= retriever,
+    return_source_documents=True,
+    chain_type_kwargs={
+        "verbose": True,
+        "prompt": prompt
+    }
+  )
+  
   # Set verbose=True to see the full prompt:
-  return load_qa_chain(llm=llm, chain_type="stuff", prompt=prompt)
-
-# COMMAND ----------
-
-qa_chain = build_qa_chain()
+  return qa_chain
 
 # COMMAND ----------
 

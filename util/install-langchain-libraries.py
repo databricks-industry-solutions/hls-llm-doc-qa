@@ -1,5 +1,5 @@
 # Databricks notebook source
-# MAGIC %pip install -U transformers==4.29.2 sentence-transformers==2.2.2 langchain==0.0.190 chromadb==0.3.25
+# MAGIC %pip install -U transformers sentence-transformers mlflow==2.10.0 langchain==0.1.4 databricks-vectorsearch==0.22
 
 # COMMAND ----------
 

@@ -46,13 +46,14 @@ dbutils.widgets.text("Vectorstore_Persist_Path", "/dbfs/tmp/langchain_hls/db")
 # publicly accessible bucket with PDFs for this demo
 dbutils.widgets.text("Source_Documents", "s3a://db-gtm-industry-solutions/data/hls/llm_qa/")
 
+# Location for the split documents to be saved  
+dbutils.widgets.text("Persisted_UC_Table_Location", "hls_llm_qa_demo_ws.vse.hls_llm_qa_raw_docs")
 
 # Vector Search Endpoint Name 
 dbutils.widgets.text("Vector_Search_Endpoint", "hls_llm_qa_demo_vse")
 
 # Vector Index Name 
 dbutils.widgets.text("Vector_Index", "hls_llm_qa_demo_ws.vse.hls_llm_qa_hf_embeddings")
-
 
 # where you want the Hugging Face models to be temporarily saved
 hf_cache_path = "/dbfs/tmp/cache/hf"
@@ -66,6 +67,7 @@ db_persist_path = dbutils.widgets.get("Vectorstore_Persist_Path")
 embeddings_model = dbutils.widgets.get("Embeddings_Model")
 vector_search_endpoint_name = dbutils.widgets.get("Vector_Search_Endpoint")
 vector_index_name = dbutils.widgets.get("Vector_Index")
+UC_table_save_location = dbutils.widgets.get("Persisted_UC_Table_Location")
 
 # COMMAND ----------
 
@@ -200,30 +202,22 @@ from pyspark.sql.functions import col, monotonically_increasing_id
 documents_with_id = spark.createDataFrame(documents).withColumn("metadata", col("metadata").cast("string")).withColumn("id", monotonically_increasing_id())
 
 # Write the dataframe to Unity Catalog to be used as source table
-# documents_with_id.write.option("mergeSchema", "true").mode("overwrite").format("delta").saveAsTable("hls_llm_qa_demo_ws.vse.hls_llm_qa_raw_docs")
+documents_with_id.write.option("mergeSchema", "true").mode("overwrite").format("delta").saveAsTable(UC_table_save_location)
 
 # display(documents_with_id)
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC ALTER TABLE hls_llm_qa_demo_ws.vse.hls_llm_qa_raw_docs SET TBLPROPERTIES (delta.enableChangeDataFeed = true)
+# MAGIC ALTER TABLE ${Persisted_UC_Table_Location} SET TBLPROPERTIES (delta.enableChangeDataFeed = true)
 
 # COMMAND ----------
 
-# MAGIC %md 
-# MAGIC
-# MAGIC #TODO 
-# MAGIC
-# MAGIC - Confirm embedding dimension
-# MAGIC - index requires a UC target to save 
-# MAGIC - 
-
-# COMMAND ----------
-
-index = client.create_delta_sync_index(
+# DBTITLE 1,Check if the endpoint already exists , otherwise create a new one
+if not client.get_endpoint(vector_search_endpoint_name):
+  index = client.create_delta_sync_index(
   endpoint_name= vector_search_endpoint_name,
-  source_table_name= "hls_llm_qa_demo_ws.vse.hls_llm_qa_raw_docs",
+  source_table_name= UC_table_save_location,
   index_name= vector_index_name,
   pipeline_type='TRIGGERED',
   primary_key="id",
@@ -286,7 +280,11 @@ def get_retriever(persist_dir: str = None):
 
 
 # test our retriever
-vectorstore = get_retriever()
+retriever = get_retriever()
 
-similar_documents = vectorstore.get_relevant_documents("What is cystic fibrosis?")
+similar_documents = retriever.get_relevant_documents("What is cystic fibrosis?")
 print(f"Relevant documents: {similar_documents[0]}")
+
+# COMMAND ----------
+
+
