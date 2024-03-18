@@ -35,7 +35,7 @@
 # COMMAND ----------
 
 # which LLM do you want to use? Grab the name of the model you deployed in step 04 from Databricks Model Serving
-dbutils.widgets.text('model_name_from_model_serving',"llama-2-7b-chat")
+dbutils.widgets.text('model_name_from_model_serving',"ws_models.hls_demo.hls_llm_qa_ws")
 
 # which embeddings model from Hugging Face 🤗  you would like to use; for biomedical applications we have been using this model recently
 # also worth trying this model for embeddings for comparison: pritamdeka/BioBERT-mnli-snli-scinli-scitail-mednli-stsb
@@ -59,7 +59,8 @@ dbutils.widgets.text("Vector_Index", "hls_llm_qa_demo_ws.vse.hls_llm_qa_hf_embed
 # COMMAND ----------
 
 #get widget values
-model_name= dbutils.widgets.get('model_name_from_model_serving')
+model_endpoint_name= "llama-2-7b-chat-ws"
+# dbutils.widgets.get('model_name_from_model_serving')
 db_persist_path = dbutils.widgets.get("Vectorstore_Persist_Path")
 embeddings_model = dbutils.widgets.get("Embeddings_Model")
 
@@ -126,8 +127,9 @@ from langchain.llms import Databricks
 os.environ['DATABRICKS_URL'] = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiUrl().getOrElse(None) 
 os.environ['DATABRICKS_TOKEN'] = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().getOrElse(None)
 
-llm = Databricks(endpoint_name=model_name)
-# llm = Databricks(endpoint_name=model_name, model_kwargs={"temperature": 0.1, "max_new_tokens": 512})
+# llm = Databricks(endpoint_name=model_name)
+llm = Databricks(endpoint_name=model_endpoint_name, extra_params={"temperature": 0.1, "max_new_tokens": 100}, allow_dangerous_deserialization=True)
+# llm("How are you?")
 # This is giving following error: ValueError: Cannot set both extra_params and extra_params. 
 #  441 if self.model_kwargs is not None and self.extra_params is not None:
 
@@ -216,17 +218,25 @@ def build_qa_chain():
 
 # COMMAND ----------
 
+qa_chain = build_qa_chain()
+
+# COMMAND ----------
+
+question = "Is probability a class topic?"
+result = qa_chain({"query": question})
+# Check the result of the query
+result["result"]
+# Check the source document from where we 
+result["source_documents"][0]
+
+# COMMAND ----------
+
 def answer_question(question):
-  similar_docs = retriever.get_relevant_documents(question)
-  result = qa_chain({"input_documents": similar_docs, "question": question})
-  result_html = f"<p><blockquote style=\"font-size:24\">{question}</blockquote></p>"
-  result_html += f"<p><blockquote style=\"font-size:18px\">{result['output_text']}</blockquote></p>" #depending on which prompt template you use, different response parsing might be needed - try the below if you get "IndexError: list index out of range"
-  #result_html += f"<p><blockquote style=\"font-size:18px\">{result['output_text'].split('### Response')[1].strip()}</blockquote></p>"
-  result_html += "<p><hr/></p>"
-  for d in result["input_documents"]:
-    source_id = d.metadata["source"]
-    result_html += f"<p><blockquote>{d.page_content}<br/>(Source: <a href=\"{source_id}\">{source_id}</a>)</blockquote></p>"
-  displayHTML(result_html)
+  qa_chain = build_qa_chain()
+  result = qa_chain({"query": question})
+  answer = result["result"]
+  source_docs = result["source_documents"]
+  displayHTML(answer, source_docs)
 
 # COMMAND ----------
 

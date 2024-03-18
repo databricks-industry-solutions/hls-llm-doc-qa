@@ -20,6 +20,7 @@
 # COMMAND ----------
 
 # MAGIC %pip install --upgrade "mlflow-skinny[databricks]>=2.4.1"
+# MAGIC %pip install databricks-sdk==0.12.0 
 # MAGIC %pip install safetensors
 # MAGIC dbutils.library.restartPython()
 
@@ -28,7 +29,16 @@
 from huggingface_hub import login
 
 # Login to Huggingface to get access to the model if you use the official version of Llama 2
-login(token=dbutils.secrets.get('solution-accelerator-cicd', 'huggingface'))
+# login(token=dbutils.secrets.get('solution-accelerator-cicd', 'huggingface'))
+
+login(token=dbutils.secrets.get('will_smith_secrets', 'huggingface'))
+
+# COMMAND ----------
+
+import os 
+# url used to send the request to your model from the serverless endpoint
+host = "https://" + spark.conf.get("spark.databricks.workspaceUrl")
+os.environ['DATABRICKS_TOKEN'] = dbutils.secrets.get("will_smith_secrets", "PAT_HLS")
 
 # COMMAND ----------
 
@@ -141,7 +151,15 @@ class Llama2(mlflow.pyfunc.PythonModel):
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC Log the model to MLFlow
+# MAGIC Log the model to MLFlow and register the modl using Models in Unity Caalog 
+
+# COMMAND ----------
+
+# MAGIC %sql 
+# MAGIC
+# MAGIC CREATE CATALOG IF NOT EXISTS ws_models;
+# MAGIC
+# MAGIC CREATE DATABASE IF NOT EXISTS ws_models.hls_demo
 
 # COMMAND ----------
 
@@ -149,6 +167,9 @@ from mlflow.models.signature import ModelSignature
 from mlflow.types import DataType, Schema, ColSpec
 
 import pandas as pd
+
+mlflow.set_registry_uri("databricks-uc")
+model_name = "ws_models.hls_demo.hls_llm_qa_ws"
 
 # Define input and output schema
 input_schema = Schema([
@@ -170,6 +191,7 @@ with mlflow.start_run() as run:
     mlflow.pyfunc.log_model(
         "model",
         python_model=Llama2(),
+        registered_model_name=model_name,
         artifacts={'repository' : snapshot_location},
         pip_requirements=["torch", "transformers", "accelerate", "safetensors"],
         input_example=input_example,
@@ -178,18 +200,12 @@ with mlflow.start_run() as run:
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ### Register the model
+# DBTITLE 1,Add Alias to the new model that was registered
+from mlflow import MlflowClient
+client = MlflowClient()
 
-# COMMAND ----------
-
-# Register model in MLflow Model Registry
-# This may take about 6 minutes to complete
-result = mlflow.register_model(
-    "runs:/"+run.info.run_id+"/model",
-    name="llama-2-7b-chat",
-    await_registration_for=1000,
-)
+# create "Champion" alias for version 1 of model "prod.ml_team.iris_model"
+client.set_registered_model_alias(model_name, "Champion", 1)
 
 # COMMAND ----------
 
@@ -200,22 +216,27 @@ result = mlflow.register_model(
 
 # COMMAND ----------
 
-"""
+
 import mlflow
 import pandas as pd
 
-loaded_model = mlflow.pyfunc.load_model(f"models:/{registered_name}@Champion")
+# debug
+mlflow.set_registry_uri("databricks-uc")
+model_name = "ws_models.hls_demo.hls_llm_qa_ws"
+
+model_version_uri = f"models:/{model_name}@Champion"
+loaded_model = mlflow.pyfunc.load_model(model_version_uri)
+
+# COMMAND ----------
 
 # Make a prediction using the loaded model
 loaded_model.predict(
     {
-        "prompt": ["What is ML?", "What is large language model?"],
+        "prompt": ["What is ML?", "What is a large language model?"],
         "temperature": [0.1, 0.5],
         "max_new_tokens": [100, 100],
     }
 )
-
-"""
 
 # COMMAND ----------
 
@@ -230,77 +251,52 @@ loaded_model.predict(
 
 # COMMAND ----------
 
-#this should be the name of the registered model from the previous step
-model_name = 'llama-2-7b-chat'
-
-# Provide a name to the serving endpoint
-endpoint_name = 'llama-2-7b-chat'
-
-# COMMAND ----------
-
-import mlflow
-from mlflow.tracking.client import MlflowClient
-client = MlflowClient
-
-def get_latest_model_version(model_name: str):
-  client = MlflowClient()
-  models = client.get_latest_versions(model_name, stages=["None"])
-  for m in models:
-    new_model_version = m.version
-  return new_model_version
+# Helper function
+def get_latest_model_version(model_name):
+    mlflow_client = MlflowClient()
+    latest_version = 1
+    for mv in mlflow_client.search_model_versions(f"name='{model_name}'"):
+        version_int = int(mv.version)
+        if version_int > latest_version:
+            latest_version = version_int
+    return latest_version
 
 model_version = get_latest_model_version(model_name)
 
 # COMMAND ----------
 
-# MAGIC %run ./util/create-update-serving-endpoint
+# Create or update serving endpoint
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.serving import EndpointCoreConfigInput, ServedModelInput
 
-# COMMAND ----------
+serving_endpoint_name = 'hls_llm_qa_ws_model_endpoint'
+latest_model_version = get_latest_model_version(model_name)
 
-served_models = [
-    {
-      "name": model_name,
-      "model_name": model_name,
-      "model_version": model_version,
-      "workload_size": "Small",
-      "workload_type": "GPU_MEDIUM",
-      "scale_to_zero_enabled": False
-    }
-]
-traffic_config = {"routes": [{"served_model_name": model_name, "traffic_percentage": "100"}]}
+w = WorkspaceClient()
+endpoint_config = EndpointCoreConfigInput(
+    name=serving_endpoint_name,
+    served_models=[
+        ServedModelInput(
+            model_name=model_name,
+            model_version=latest_model_version,
+            workload_size="Small",
+            scale_to_zero_enabled=True,
+            environment_vars={
+                "DATABRICKS_TOKEN": "{{secrets/dbdemos/rag_sp_token}}",  # <scope>/<secret> that contains an access token
+            }
+        )
+    ]
+)
 
-# Create or update model serving endpoint
-
-if not endpoint_exists(endpoint_name):
-  create_endpoint(endpoint_name, served_models)
+existing_endpoint = next(
+    (e for e in w.serving_endpoints.list() if e.name == serving_endpoint_name), None
+)
+if existing_endpoint == None:
+    print(f"Creating the endpoint {serving_endpoint_name}, this will take a few minutes to package and deploy the endpoint...")
+    w.serving_endpoints.create_and_wait(name=serving_endpoint_name, config=endpoint_config)
 else:
-  update_endpoint(endpoint_name, served_models)
-
-# COMMAND ----------
-
-# MAGIC %md 
-# MAGIC (Optional) Use the SDK instead of the API Above
-
-# COMMAND ----------
-
-# from databricks.sdk import WorkspaceClient
-# from databricks.sdk.service.serving import *
-# from datetime import timedelta
-# w = WorkspaceClient()
-# served_models = [ServedModelInput(model_name=model_name, 
-#                                   model_version=model_version, 
-#                                   workload_size='Small',
-#                                   workload_type='GPU_MEDIUM', # additional param for GPU serving 
-#                                   scale_to_zero_enabled='False')]
-
-# try:
-#   w.serving_endpoints.create_and_wait(name=endpoint_name, 
-#                                      config=EndpointCoreConfigInput(served_models=served_models), 
-#                                      timeout=timedelta(minutes=40)) # extending timeout for GPU serving; default is 20
-# except: # when the endpoint already exists, update it
-#   w.serving_endpoints.update_config_and_wait(name=endpoint_name, 
-#                                              served_models=served_models, 
-#                                              timeout=timedelta(minutes=40))
+    print(f"Updating the endpoint {serving_endpoint_name} to version {latest_model_version}, this will take a few minutes to package and deploy the endpoint...")
+    w.serving_endpoints.update_config_and_wait(served_models=endpoint_config.served_models, name=serving_endpoint_name)
 
 # COMMAND ----------
 
