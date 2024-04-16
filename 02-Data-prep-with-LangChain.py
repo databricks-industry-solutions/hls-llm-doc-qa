@@ -30,7 +30,7 @@
 # COMMAND ----------
 
 # where you want the PDFs to be saved in your environment
-dbutils.widgets.text("UC_Volume_Path", "hls_llm_qa_demo_temp.data.pdf_docs")
+dbutils.widgets.text("UC_Volume_Path", "hls_llm_qa_demo.data.pdf_docs")
 
 # which embeddings model we want to use. We are going to use the foundation model API, but you can use custom models (i.e. from HuggingFace), External Models (Azure OpenAI), etc.
 dbutils.widgets.text("Embeddings_Model", "bge-large-en")
@@ -39,16 +39,16 @@ dbutils.widgets.text("Embeddings_Model", "bge-large-en")
 dbutils.widgets.text("Source_Documents", "s3a://db-gtm-industry-solutions/data/hls/llm_qa/")
 
 # Location for the split documents to be saved  
-dbutils.widgets.text("Persisted_UC_Table_Location", "hls_llm_qa_demo_temp.vse.hls_llm_qa_raw_docs")
+dbutils.widgets.text("Persisted_UC_Table_Location", "hls_llm_qa_demo.vse.hls_llm_qa_raw_docs")
 
 # Vector Search Endpoint Name - one-env-shared-endpoint-7, hls_llm_qa_demo_vse
 dbutils.widgets.text("Vector_Search_Endpoint", "hls_llm_qa_demo_vse")
 
 # Vector Index Name 
-dbutils.widgets.text("Vector_Index", "hls_llm_qa_demo_temp.vse.hls_llm_qa_embeddings")
+dbutils.widgets.text("Vector_Index", "hls_llm_qa_demo.vse.hls_llm_qa_embeddings")
 
 # Target Catalog Name
-dbutils.widgets.text("Catalog_Name", "hls_llm_qa_demo_temp")
+dbutils.widgets.text("Catalog_Name", "hls_llm_qa_demo")
 
 # Target VSE Schema Name
 dbutils.widgets.text("Vse_Schema_Name", "vse")
@@ -64,7 +64,7 @@ vector_index_name = dbutils.widgets.get("Vector_Index")
 UC_table_save_location = dbutils.widgets.get("Persisted_UC_Table_Location")
 
 # TEMORARY - NEED TO ADD STRING LOGIC TO GENERATE:
-volume_path = "/Volumes/hls_llm_qa_demo_temp/data/pdf_docs"
+volume_path = "/Volumes/hls_llm_qa_demo/data/pdf_docs"
 
 # COMMAND ----------
 
@@ -109,24 +109,20 @@ volume_path = "/Volumes/hls_llm_qa_demo_temp/data/pdf_docs"
 import os
 import shutil
 
-# in case you rerun this notebook, this deletes the directory and recreates it to prevent file duplication
-if os.path.exists(pdf_path):
-  shutil.rmtree(pdf_path, ignore_errors=True)
-os.makedirs(pdf_path)
-
+# Copy the files from S3 to the Unity Catalog Volumes location
 dbutils.fs.cp(source_pdfs, volume_path, True)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC All of the PDFs should now be accessible in the `Unity Catalog Volume` now; you can run the below command to check if you want.
+# MAGIC
+# MAGIC `dbutils.fs.ls(volume_path)`
 
 # COMMAND ----------
 
 dbutils.fs.ls(volume_path)
 
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC All of the PDFs should now be accessible in the `pdf_path` now; you can run the below command to check if you want.
-# MAGIC
-# MAGIC `!ls {pdf_path}`
 
 # COMMAND ----------
 
@@ -137,9 +133,9 @@ dbutils.fs.ls(volume_path)
 # MAGIC These documents are embedded, so that later queries can be embedded too, and matched to relevant text chunks by embedding.
 # MAGIC
 # MAGIC - Use `langchain` to reading directly from PDFs, although LangChain also supports txt, HTML, Word docs, GDrive, PDFs, etc.
-# MAGIC - Create a simple in-memory Chroma vector DB for storage
-# MAGIC - Instantiate an embedding function from `sentence-transformers`
-# MAGIC - Populate the database and save it
+# MAGIC - Create a Databricks Vector Search endpoint to have a persistent vector index.
+# MAGIC - Use the Foundation Model APIs to generate the embeddings to sync against the vector index.
+# MAGIC - Sync the vector index to populate for our rag implementation.
 
 # COMMAND ----------
 
@@ -152,6 +148,7 @@ dbutils.fs.ls(volume_path)
 from langchain.docstore.document import Document
 from langchain.document_loaders import PyPDFDirectoryLoader
 
+# Load directly from Unity Catalog Volumes
 loader_path = volume_path
 
 pdf_loader = PyPDFDirectoryLoader(loader_path)
