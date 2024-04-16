@@ -1,8 +1,4 @@
 # Databricks notebook source
-# MAGIC %md This notebook is available at https://github.com/databricks-industry-solutions/hls-llm-doc-qa
-
-# COMMAND ----------
-
 # MAGIC %md
 # MAGIC # Biomedical Question Answering over Custom Datasets with 🦜️🔗 LangChain and Open Source LLMs on Hugging Face 🤗 
 # MAGIC

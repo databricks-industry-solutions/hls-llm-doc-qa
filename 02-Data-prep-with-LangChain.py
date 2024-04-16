@@ -1,8 +1,4 @@
 # Databricks notebook source
-# MAGIC %md This notebook is available at https://github.com/databricks-industry-solutions/hls-llm-doc-qa
-
-# COMMAND ----------
-
 # MAGIC %md
 # MAGIC ## Document Ingestion and Preparation
 # MAGIC
