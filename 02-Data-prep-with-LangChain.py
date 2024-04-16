@@ -39,7 +39,7 @@ dbutils.widgets.text("PDF_Path", "/dbfs/tmp/langchain_hls/pdfs")
 # which embeddings model from Hugging Face 🤗  you would like to use; for biomedical applications we have been using this model recently
 # also worth trying this model for embeddings for comparison: pritamdeka/BioBERT-mnli-snli-scinli-scitail-mednli-stsb
 dbutils.widgets.text("Embeddings_Model", "pritamdeka/S-PubMedBert-MS-MARCO")
-
+a
 # where you want the vectorstore to be persisted across sessions, so that you don't have to regenerate
 dbutils.widgets.text("Vectorstore_Persist_Path", "/dbfs/tmp/langchain_hls/db")
 
@@ -47,13 +47,13 @@ dbutils.widgets.text("Vectorstore_Persist_Path", "/dbfs/tmp/langchain_hls/db")
 dbutils.widgets.text("Source_Documents", "s3a://db-gtm-industry-solutions/data/hls/llm_qa/")
 
 # Location for the split documents to be saved  
-dbutils.widgets.text("Persisted_UC_Table_Location", "hls_llm_qa_demo_ws.vse.hls_llm_qa_raw_docs")
+dbutils.widgets.text("Persisted_UC_Table_Location", "hls_llm_qa_demo_temp.vse.hls_llm_qa_raw_docs")
 
 # Vector Search Endpoint Name 
 dbutils.widgets.text("Vector_Search_Endpoint", "hls_llm_qa_demo_vse")
 
 # Vector Index Name 
-dbutils.widgets.text("Vector_Index", "hls_llm_qa_demo_ws.vse.hls_llm_qa_hf_embeddings")
+dbutils.widgets.text("Vector_Index", "hls_llm_qa_demo_temp.vse.hls_llm_qa_embeddings")
 
 # where you want the Hugging Face models to be temporarily saved
 hf_cache_path = "/dbfs/tmp/cache/hf"
@@ -68,6 +68,17 @@ embeddings_model = dbutils.widgets.get("Embeddings_Model")
 vector_search_endpoint_name = dbutils.widgets.get("Vector_Search_Endpoint")
 vector_index_name = dbutils.widgets.get("Vector_Index")
 UC_table_save_location = dbutils.widgets.get("Persisted_UC_Table_Location")
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC -- Create Unity catalog if it does not exist
+# MAGIC -- Use IF NOT EXISTS clause to avoid errors if the catalog already exists
+# MAGIC CREATE CATALOG IF NOT EXISTS hls_llm_qa_demo_temp;
+# MAGIC
+# MAGIC -- Create Unity schema if it does not exist in the Unity catalog
+# MAGIC -- Use IF NOT EXISTS clause to avoid errors if the schema already exists
+# MAGIC CREATE SCHEMA IF NOT EXISTS hls_llm_qa_demo_temp.vse;
 
 # COMMAND ----------
 
@@ -176,23 +187,8 @@ display(documents)
 # MAGIC %md
 # MAGIC Now that we split the documents into more manageable chunks. We will now set up **Databricks Vector Search** with a **Direct Vector Access Index** which will be used with Langchain in our RAG architecture. 
 # MAGIC - We first need to create a dataframe with an id column to be used with Vector Search.
-# MAGIC - We will then calculate the embeddings using HuggingFaceEmbeddgins
+# MAGIC - We will then calculate the embeddings using BGE
 # MAGIC - Finally we will save this in our Vector Search as an index to be used for RAG.
-
-# COMMAND ----------
-
-from databricks.vector_search.client import VectorSearchClient
-
-# Automatically generates a PAT Token for authentication
-client = VectorSearchClient()
-
-# Uses the service principal token for authentication
-# client = VectorSearch(service_principal_client_id=<CLIENT_ID>,service_principal_client_secret=<CLIENT_SECRET>)
-
-# client.create_endpoint(
-#     name= vector_search_endpoint_name,
-#     endpoint_type="STANDARD"
-# )
 
 # COMMAND ----------
 
@@ -208,13 +204,33 @@ documents_with_id.write.option("mergeSchema", "true").mode("overwrite").format("
 
 # COMMAND ----------
 
+from databricks.vector_search.client import VectorSearchClient
+
+# Automatically generates a PAT Token for authentication
+client = VectorSearchClient()
+
+# Uses the service principal token for authentication
+# client = VectorSearch(service_principal_client_id=<CLIENT_ID>,service_principal_client_secret=<CLIENT_SECRET>)
+
+if vector_search_endpoint_name not in [item['name'] for item in client.list_endpoints()['endpoints']]:
+  print("Creating new VSE " + vector_search_endpoint_name)
+  client.create_endpoint(
+    name= vector_search_endpoint_name,
+    endpoint_type="STANDARD"
+  )
+else: 
+  print("Vector search endpoint: " + vector_search_endpoint_name + " already exists!")
+
+# COMMAND ----------
+
 # MAGIC %sql
 # MAGIC ALTER TABLE ${Persisted_UC_Table_Location} SET TBLPROPERTIES (delta.enableChangeDataFeed = true)
 
 # COMMAND ----------
 
 # DBTITLE 1,Check if the endpoint already exists , otherwise create a new one
-if not client.get_endpoint(vector_search_endpoint_name):
+if vector_index_name not in [item['name'] for item in client.list_indexes(vector_search_endpoint_name)['vector_indexes']]:
+  print("Creating vector index: " + vector_index_name)
   index = client.create_delta_sync_index(
   endpoint_name= vector_search_endpoint_name,
   source_table_name= UC_table_save_location,
@@ -224,6 +240,9 @@ if not client.get_endpoint(vector_search_endpoint_name):
   embedding_source_column= "page_content",
   embedding_model_endpoint_name="databricks-bge-large-en" 
 )
+else: 
+  print("Vector index: " + vector_index_name + " already exists!")
+
 
 # COMMAND ----------
 

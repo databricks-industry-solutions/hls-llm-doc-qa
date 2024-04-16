@@ -26,19 +26,37 @@
 
 # COMMAND ----------
 
+# where you want the PDFs to be saved in your environment
+dbutils.widgets.text("Model_Schema_Path", "hls_llm_qa_demo_temp.hls_demo_models")
+
+# which embeddings model from Hugging Face 🤗  you would like to use; for biomedical applications we have been using this model recently
+# also worth trying this model for embeddings for comparison: pritamdeka/BioBERT-mnli-snli-scinli-scitail-mednli-stsb
+dbutils.widgets.text("Model_Path", "hls_llm_qa_demo_temp.hls_demo_models.hls_llm_qa_model")
+
+# where you want the vectorstore to be persisted across sessions, so that you don't have to regenerate
+dbutils.widgets.text("Model_Serving_Path", "hls_llm_qa_temp_model_endpoint")
+
+# COMMAND ----------
+
+model_schema_path = dbutils.widgets.get("Model_Schema_Path")
+model_path = dbutils.widgets.get("Model_Path")
+model_serving_path = dbutils.widgets.get("Model_Serving_Path")
+
+# COMMAND ----------
+
 from huggingface_hub import login
 
 # Login to Huggingface to get access to the model if you use the official version of Llama 2
 # login(token=dbutils.secrets.get('solution-accelerator-cicd', 'huggingface'))
 
-login(token=dbutils.secrets.get('will_smith_secrets', 'huggingface'))
+login(token=dbutils.secrets.get("SECRET_SCOPE", "SECRET"))
 
 # COMMAND ----------
 
 import os 
 # url used to send the request to your model from the serverless endpoint
 host = "https://" + spark.conf.get("spark.databricks.workspaceUrl")
-os.environ['DATABRICKS_TOKEN'] = dbutils.secrets.get("will_smith_secrets", "PAT_HLS")
+os.environ['DATABRICKS_TOKEN'] = dbutils.secrets.get([SECRET_SCOPE], [SECRET])
 
 # COMMAND ----------
 
@@ -157,9 +175,9 @@ class Llama2(mlflow.pyfunc.PythonModel):
 
 # MAGIC %sql 
 # MAGIC
-# MAGIC CREATE CATALOG IF NOT EXISTS ws_models;
+# MAGIC CREATE CATALOG IF NOT EXISTS hls_llm_qa_demo_temp;
 # MAGIC
-# MAGIC CREATE DATABASE IF NOT EXISTS ws_models.hls_demo
+# MAGIC CREATE DATABASE IF NOT EXISTS ${Model_Schema_Path}
 
 # COMMAND ----------
 
@@ -169,7 +187,7 @@ from mlflow.types import DataType, Schema, ColSpec
 import pandas as pd
 
 mlflow.set_registry_uri("databricks-uc")
-model_name = "ws_models.hls_demo.hls_llm_qa_ws"
+model_name = model_path
 
 # Define input and output schema
 input_schema = Schema([
@@ -204,7 +222,7 @@ with mlflow.start_run() as run:
 from mlflow import MlflowClient
 client = MlflowClient()
 
-# create "Champion" alias for version 1 of model "prod.ml_team.iris_model"
+# create "Champion" alias for version 1 of model 
 client.set_registered_model_alias(model_name, "Champion", 1)
 
 # COMMAND ----------
@@ -216,13 +234,12 @@ client.set_registered_model_alias(model_name, "Champion", 1)
 
 # COMMAND ----------
 
-
 import mlflow
 import pandas as pd
 
 # debug
 mlflow.set_registry_uri("databricks-uc")
-model_name = "ws_models.hls_demo.hls_llm_qa_ws"
+model_name =  model_path
 
 model_version_uri = f"models:/{model_name}@Champion"
 loaded_model = mlflow.pyfunc.load_model(model_version_uri)
@@ -269,7 +286,7 @@ model_version = get_latest_model_version(model_name)
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.serving import EndpointCoreConfigInput, ServedModelInput
 
-serving_endpoint_name = 'hls_llm_qa_ws_model_endpoint'
+serving_endpoint_name = model_serving_path
 latest_model_version = get_latest_model_version(model_name)
 
 w = WorkspaceClient()
