@@ -1,8 +1,4 @@
 # Databricks notebook source
-# MAGIC %md This notebook is available at https://github.com/databricks-industry-solutions/hls-llm-doc-qa
-
-# COMMAND ----------
-
 # MAGIC %md
 # MAGIC ## Using an LLM Served on Databricks Model Serving: A LangChain app
 # MAGIC
@@ -34,34 +30,28 @@
 
 # COMMAND ----------
 
-# which LLM do you want to use? Grab the name of the model you deployed in step 04 from Databricks Model Serving
-dbutils.widgets.text('model_name_from_model_serving',"ws_models.hls_demo.hls_llm_qa_ws")
 
-# which embeddings model from Hugging Face 🤗  you would like to use; for biomedical applications we have been using this model recently
-# also worth trying this model for embeddings for comparison: pritamdeka/BioBERT-mnli-snli-scinli-scitail-mednli-stsb
-dbutils.widgets.text("Embeddings_Model", "pritamdeka/S-PubMedBert-MS-MARCO")
+# which embeddings model we want to use. We are going to use the foundation model API, but you can use custom models (i.e. from HuggingFace), External Models (Azure OpenAI), etc.
+dbutils.widgets.text("Embeddings_Model", "bge-large-en")
 
-# where was the vectorstore persisted in the previous notebook?
-dbutils.widgets.text("Vectorstore_Persist_Path", "/dbfs/tmp/langchain_hls/db")
-
-# where you want the Hugging Face models to be temporarily saved
-hf_cache_path = "/dbfs/tmp/cache/hf"
+# which LLM model we want to use. We are going to use the foundation model API, but you can use custom models (i.e. from HuggingFace), External Models (Azure OpenAI), etc.
+dbutils.widgets.text("FMAPI_Model", "databricks-dbrx-instruct")
 
 # Location for the split documents to be saved  
-dbutils.widgets.text("Persisted_UC_Table_Location", "hls_llm_qa_demo_ws.vse.hls_llm_qa_raw_docs")
+dbutils.widgets.text("Persisted_UC_Table_Location", "hls_llm_qa_demo_temp.vse.hls_llm_qa_raw_docs")
 
-# Vector Search Endpoint Name 
+# Vector Search Endpoint Name - one-env-shared-endpoint-7, hls_llm_qa_demo_vse
 dbutils.widgets.text("Vector_Search_Endpoint", "hls_llm_qa_demo_vse")
 
 # Vector Index Name 
-dbutils.widgets.text("Vector_Index", "hls_llm_qa_demo_ws.vse.hls_llm_qa_hf_embeddings")
+dbutils.widgets.text("Vector_Index", "hls_llm_qa_demo_temp.vse.hls_llm_qa_embeddings")
 
 # COMMAND ----------
 
 #get widget values
-model_endpoint_name= "llama-2-7b-chat-ws"
+model_endpoint_name= dbutils.widgets.get("FMAPI_Model")
+
 # dbutils.widgets.get('model_name_from_model_serving')
-db_persist_path = dbutils.widgets.get("Vectorstore_Persist_Path")
 embeddings_model = dbutils.widgets.get("Embeddings_Model")
 
 vector_search_endpoint_name = dbutils.widgets.get("Vector_Search_Endpoint")
@@ -122,42 +112,30 @@ retriever = get_retriever()
 # You can set those environment variables based on the notebook context if run on Databricks
 
 import os
+from langchain_community.llms import Databricks
+
+# os.environ['DATABRICKS_URL'] = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiUrl().getOrElse(None) 
+# os.environ['DATABRICKS_TOKEN'] = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().getOrElse(None)
+
 from langchain.llms import Databricks
+from langchain_core.messages import HumanMessage, SystemMessage
 
-os.environ['DATABRICKS_URL'] = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiUrl().getOrElse(None) 
-os.environ['DATABRICKS_TOKEN'] = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().getOrElse(None)
+def transform_input(**request):
+  request["messages"] = [
+    {
+      "role": "user",
+      "content": request["prompt"]
+    }
+  ]
+  del request["prompt"]
+  return request
 
-# llm = Databricks(endpoint_name=model_name)
-llm = Databricks(endpoint_name=model_endpoint_name, extra_params={"temperature": 0.1, "max_new_tokens": 100}, allow_dangerous_deserialization=True)
-# llm("How are you?")
-# This is giving following error: ValueError: Cannot set both extra_params and extra_params. 
-#  441 if self.model_kwargs is not None and self.extra_params is not None:
-
+llm = Databricks(endpoint_name="databricks-dbrx-instruct", transform_input_fn=transform_input)
 
 #if you want answers to generate faster, set the number of tokens above to a smaller number
 prompt = "What is cystic fibrosis?"
-#sample question, if you want to try it out
+
 displayHTML(llm(prompt))
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC If you were not able to deploy to GPU serving in the previous step but you were able to register the model with MLflow, you can load the model from the registry using the below code. This will require you to run this notebook on a GPU cluster.
-# MAGIC
-
-# COMMAND ----------
-
-
-'''
-import mlflow
-import pandas as pd
-loaded_model = mlflow.pyfunc.load_model(f"models:/llama2-7b-MedText-QLoRA/latest")
-
-# Make a prediction using the loaded model
-input_example=pd.DataFrame({"prompt":["what is ML?", "Name 10 colors."], "temperature": [0.5, 0.2],"max_tokens": [100, 200]})
-print(loaded_model.predict(input_example))
-
-'''
 
 # COMMAND ----------
 
@@ -236,7 +214,8 @@ def answer_question(question):
   result = qa_chain({"query": question})
   answer = result["result"]
   source_docs = result["source_documents"]
-  displayHTML(answer, source_docs)
+  displayHTML(answer)
+  displayHTML(source_docs)
 
 # COMMAND ----------
 

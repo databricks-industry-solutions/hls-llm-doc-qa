@@ -34,14 +34,10 @@
 # COMMAND ----------
 
 # where you want the PDFs to be saved in your environment
-dbutils.widgets.text("PDF_Path", "/dbfs/tmp/langchain_hls/pdfs")
+dbutils.widgets.text("UC_Volume_Path", "hls_llm_qa_demo_temp.data.pdf_docs")
 
-# which embeddings model from Hugging Face 🤗  you would like to use; for biomedical applications we have been using this model recently
-# also worth trying this model for embeddings for comparison: pritamdeka/BioBERT-mnli-snli-scinli-scitail-mednli-stsb
-dbutils.widgets.text("Embeddings_Model", "pritamdeka/S-PubMedBert-MS-MARCO")
-a
-# where you want the vectorstore to be persisted across sessions, so that you don't have to regenerate
-dbutils.widgets.text("Vectorstore_Persist_Path", "/dbfs/tmp/langchain_hls/db")
+# which embeddings model we want to use. We are going to use the foundation model API, but you can use custom models (i.e. from HuggingFace), External Models (Azure OpenAI), etc.
+dbutils.widgets.text("Embeddings_Model", "bge-large-en")
 
 # publicly accessible bucket with PDFs for this demo
 dbutils.widgets.text("Source_Documents", "s3a://db-gtm-industry-solutions/data/hls/llm_qa/")
@@ -49,43 +45,44 @@ dbutils.widgets.text("Source_Documents", "s3a://db-gtm-industry-solutions/data/h
 # Location for the split documents to be saved  
 dbutils.widgets.text("Persisted_UC_Table_Location", "hls_llm_qa_demo_temp.vse.hls_llm_qa_raw_docs")
 
-# Vector Search Endpoint Name 
+# Vector Search Endpoint Name - one-env-shared-endpoint-7, hls_llm_qa_demo_vse
 dbutils.widgets.text("Vector_Search_Endpoint", "hls_llm_qa_demo_vse")
 
 # Vector Index Name 
 dbutils.widgets.text("Vector_Index", "hls_llm_qa_demo_temp.vse.hls_llm_qa_embeddings")
 
-# where you want the Hugging Face models to be temporarily saved
-hf_cache_path = "/dbfs/tmp/cache/hf"
+# Target Catalog Name
+dbutils.widgets.text("Catalog_Name", "hls_llm_qa_demo_temp")
+
+# Target VSE Schema Name
+dbutils.widgets.text("Vse_Schema_Name", "vse")
 
 # COMMAND ----------
 
 #get widget values
-pdf_path = dbutils.widgets.get("PDF_Path")
+pdf_path = dbutils.widgets.get("UC_Volume_Path")
 source_pdfs = dbutils.widgets.get("Source_Documents")
-db_persist_path = dbutils.widgets.get("Vectorstore_Persist_Path")
 embeddings_model = dbutils.widgets.get("Embeddings_Model")
 vector_search_endpoint_name = dbutils.widgets.get("Vector_Search_Endpoint")
 vector_index_name = dbutils.widgets.get("Vector_Index")
 UC_table_save_location = dbutils.widgets.get("Persisted_UC_Table_Location")
+
+# TEMORARY - NEED TO ADD STRING LOGIC TO GENERATE:
+volume_path = "/Volumes/hls_llm_qa_demo_temp/data/pdf_docs"
 
 # COMMAND ----------
 
 # MAGIC %sql
 # MAGIC -- Create Unity catalog if it does not exist
 # MAGIC -- Use IF NOT EXISTS clause to avoid errors if the catalog already exists
-# MAGIC CREATE CATALOG IF NOT EXISTS hls_llm_qa_demo_temp;
-# MAGIC
-# MAGIC -- Create Unity schema if it does not exist in the Unity catalog
-# MAGIC -- Use IF NOT EXISTS clause to avoid errors if the schema already exists
-# MAGIC CREATE SCHEMA IF NOT EXISTS hls_llm_qa_demo_temp.vse;
+# MAGIC CREATE CATALOG IF NOT EXISTS ${Catalog_Name};
 
 # COMMAND ----------
 
-import os
-# Optional, but helpful to avoid re-downloading the weights repeatedly. Set to any `/dbfs` path.
-os.environ['TRANSFORMERS_CACHE'] = hf_cache_path
-#os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:512"
+# MAGIC %sql
+# MAGIC -- Create Unity schema if it does not exist in the Unity catalog
+# MAGIC -- Use IF NOT EXISTS clause to avoid errors if the schema already exists
+# MAGIC CREATE SCHEMA IF NOT EXISTS ${Catalog_Name}.vse;
 
 # COMMAND ----------
 
@@ -96,7 +93,20 @@ os.environ['TRANSFORMERS_CACHE'] = hf_cache_path
 # MAGIC
 # MAGIC - Grab the set of PDFs (ex: Arxiv papers allow curl, PubMed does not)
 # MAGIC - We have are providing a set of PDFs from PubMedCentral relating to Cystic Fibrosis (all from [PubMedCentral Open Access](https://www.ncbi.nlm.nih.gov/pmc/tools/openftlist/), all with the CC BY license), but any topic area would work
-# MAGIC - If you already have a repository of PDFs then you can skip this step, just organize them all in an accessible DBFS location
+# MAGIC - If you already have a repository of PDFs then you can skip this step, just organize them all in an accessible Unity Catalog Volume
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC -- Create an external volume under the newly created directory
+# MAGIC CREATE SCHEMA IF NOT EXISTS ${Catalog_Name}.data
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC -- Create an external volume under the newly created directory
+# MAGIC CREATE VOLUME IF NOT EXISTS ${UC_Volume_Path}
+# MAGIC  COMMENT 'This is the managed volume for the PDF documents'
 
 # COMMAND ----------
 
@@ -108,9 +118,12 @@ if os.path.exists(pdf_path):
   shutil.rmtree(pdf_path, ignore_errors=True)
 os.makedirs(pdf_path)
 
-# slightly modifying the file path from above to work with the dbutils.fs syntax
-modified_pdf_path = "dbfs:/" + pdf_path.lstrip("/dbfs")
-dbutils.fs.cp(source_pdfs, modified_pdf_path, True)
+dbutils.fs.cp(source_pdfs, volume_path, True)
+
+# COMMAND ----------
+
+dbutils.fs.ls(volume_path)
+
 
 # COMMAND ----------
 
@@ -135,15 +148,6 @@ dbutils.fs.cp(source_pdfs, modified_pdf_path, True)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC Prepare a directory to store the document database. Any path on `/dbfs` will do.
-
-# COMMAND ----------
-
-!(rm -r {db_persist_path} || true) && mkdir -p {db_persist_path}
-
-# COMMAND ----------
-
-# MAGIC %md
 # MAGIC Create the document database:
 # MAGIC - Here we are using the `PyPDFDirectoryLoader` loader from LangChain ([docs page](https://python.langchain.com/en/latest/modules/indexes/document_loaders/examples/pdf.html#using-pypdf)) to form `documents`; `langchain` can also form doc collections directly from PDFs, GDrive files, etc.
 
@@ -152,7 +156,7 @@ dbutils.fs.cp(source_pdfs, modified_pdf_path, True)
 from langchain.docstore.document import Document
 from langchain.document_loaders import PyPDFDirectoryLoader
 
-loader_path = f"{pdf_path}/"
+loader_path = volume_path
 
 pdf_loader = PyPDFDirectoryLoader(loader_path)
 docs = pdf_loader.load()
@@ -238,7 +242,7 @@ if vector_index_name not in [item['name'] for item in client.list_indexes(vector
   pipeline_type='TRIGGERED',
   primary_key="id",
   embedding_source_column= "page_content",
-  embedding_model_endpoint_name="databricks-bge-large-en" 
+  embedding_model_endpoint_name= embeddings_model
 )
 else: 
   print("Vector index: " + vector_index_name + " already exists!")
@@ -248,6 +252,7 @@ else:
 
 # DBTITLE 1,Load index using the Vector Search Client
 from databricks.vector_search.client import VectorSearchClient
+
 vsc = VectorSearchClient()
 
 vs_index = vsc.get_index(endpoint_name= vector_search_endpoint_name, index_name= vector_index_name)
@@ -302,7 +307,9 @@ def get_retriever(persist_dir: str = None):
 retriever = get_retriever()
 
 similar_documents = retriever.get_relevant_documents("What is cystic fibrosis?")
-print(f"Relevant documents: {similar_documents[0]}")
+
+if similar_documents:
+    print(f"Relevant documents: {similar_documents[0]}")
 
 # COMMAND ----------
 

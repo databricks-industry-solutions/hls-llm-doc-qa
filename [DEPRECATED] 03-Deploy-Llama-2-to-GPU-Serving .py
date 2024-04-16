@@ -12,6 +12,11 @@
 # MAGIC - Runtime: 13.2 GPU ML Runtime
 # MAGIC - Instance: `g5.4xlarge` on AWS
 # MAGIC
+# MAGIC
+# MAGIC Databricks Model Serving now supports Foundation Model APIs which allow you to access and query state-of-the-art open models from a serving endpoint. With Foundation Model APIs, you can quickly and easily build applications that leverage a high-quality generative AI model without maintaining your own model deployment.
+# MAGIC
+# MAGIC
+# MAGIC
 # MAGIC GPU instances that have at least 16GB GPU memory would be enough for inference on single input (batch inference requires slightly more memory). On Azure, it is possible to use `Standard_NC6s_v3` or `Standard_NC4as_T4_v3`.
 # MAGIC
 # MAGIC requirements:
