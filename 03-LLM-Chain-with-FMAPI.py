@@ -41,7 +41,7 @@ dbutils.widgets.text("FMAPI_Model", "databricks-dbrx-instruct")
 dbutils.widgets.text("Persisted_UC_Table_Location", "hls_llm_qa_demo.vse.hls_llm_qa_raw_docs")
 
 # Vector Search Endpoint Name - one-env-shared-endpoint-7, hls_llm_qa_demo_vse
-dbutils.widgets.text("Vector_Search_Endpoint", "hls_llm_qa_demo_vse")
+dbutils.widgets.text("Vector_Search_Endpoint", "one-env-shared-endpoint-7")
 
 # Vector Index Name 
 dbutils.widgets.text("Vector_Index", "hls_llm_qa_demo.vse.hls_llm_qa_embeddings")
@@ -114,8 +114,9 @@ retriever = get_retriever()
 import os
 from langchain_community.llms import Databricks
 
-# os.environ['DATABRICKS_URL'] = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiUrl().getOrElse(None) 
-# os.environ['DATABRICKS_TOKEN'] = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().getOrElse(None)
+# Need this for job run: 
+os.environ['DATABRICKS_URL'] = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiUrl().getOrElse(None) 
+os.environ['DATABRICKS_TOKEN'] = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().getOrElse(None)
 
 from langchain.llms import Databricks
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -193,6 +194,10 @@ def build_qa_chain():
 # MAGIC
 # MAGIC 🚨 Note:
 # MAGIC Here we are using an LLM without any fine tuning on a specialized dataset. As a result, similar to any other question/answering model, the LLM's results are not reliable and can be factually incorrect.
+
+# COMMAND ----------
+
+
 
 # COMMAND ----------
 

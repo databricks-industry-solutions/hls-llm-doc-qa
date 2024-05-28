@@ -42,7 +42,7 @@ dbutils.widgets.text("Source_Documents", "s3a://db-gtm-industry-solutions/data/h
 dbutils.widgets.text("Persisted_UC_Table_Location", "hls_llm_qa_demo.vse.hls_llm_qa_raw_docs")
 
 # Vector Search Endpoint Name - one-env-shared-endpoint-7, hls_llm_qa_demo_vse
-dbutils.widgets.text("Vector_Search_Endpoint", "hls_llm_qa_demo_vse")
+dbutils.widgets.text("Vector_Search_Endpoint", "one-env-shared-endpoint-7")
 
 # Vector Index Name 
 dbutils.widgets.text("Vector_Index", "hls_llm_qa_demo.vse.hls_llm_qa_embeddings")
@@ -109,7 +109,7 @@ volume_path = "/Volumes/hls_llm_qa_demo/data/pdf_docs"
 import os
 import shutil
 
-# Copy the files from S3 to the Unity Catalog Volumes location
+# Copy the files from S3 to the Unity Catalog Volumes  (s3a://db-gtm-industry-solutions/data/hls/llm_qa/)
 dbutils.fs.cp(source_pdfs, volume_path, True)
 
 # COMMAND ----------
