@@ -40,8 +40,8 @@ dbutils.widgets.text("FMAPI_Model", "databricks-dbrx-instruct")
 # Location for the split documents to be saved  
 dbutils.widgets.text("Persisted_UC_Table_Location", "hls_llm_qa_demo.vse.hls_llm_qa_raw_docs")
 
-# Vector Search Endpoint Name - one-env-shared-endpoint-7, hls_llm_qa_demo_vse
-dbutils.widgets.text("Vector_Search_Endpoint", "one-env-shared-endpoint-7")
+# Vector Search Endpoint Name - VS_ENDPOINT, hls_llm_qa_demo_vse
+dbutils.widgets.text("Vector_Search_Endpoint", "VS_ENDPOINT")
 
 # Vector Index Name 
 dbutils.widgets.text("Vector_Index", "hls_llm_qa_demo.vse.hls_llm_qa_embeddings")
@@ -66,7 +66,7 @@ UC_table_save_location = dbutils.widgets.get("Persisted_UC_Table_Location")
 # MAGIC Now we can compose the database with a language model and prompting strategy to make a `langchain` chain that answers questions.
 # MAGIC
 # MAGIC - Load Databricks Vector Search and define our retriever. We define `k` here, which is how many chunks of text we want to retrieve from the vectorstore to feed into the LLM
-# MAGIC - Instantiate an LLM, loading from Databricks Model serving here, but could be other models or even OpenAI models
+# MAGIC - Instantiate an LLM, loading from Databricks Model serving (Foundation Model APIs) here, but could be other models or even OpenAI models
 # MAGIC - Define how relevant texts are combined with a question into the LLM prompt
 
 # COMMAND ----------
@@ -115,8 +115,8 @@ import os
 from langchain_community.llms import Databricks
 
 # Need this for job run: 
-os.environ['DATABRICKS_URL'] = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiUrl().getOrElse(None) 
-os.environ['DATABRICKS_TOKEN'] = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().getOrElse(None)
+# os.environ['DATABRICKS_URL'] = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiUrl().getOrElse(None) 
+# os.environ['DATABRICKS_TOKEN'] = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().getOrElse(None)
 
 from langchain.llms import Databricks
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -197,10 +197,6 @@ def build_qa_chain():
 
 # COMMAND ----------
 
-
-
-# COMMAND ----------
-
 qa_chain = build_qa_chain()
 
 # COMMAND ----------
@@ -234,7 +230,3 @@ answer_question("What are the primary drugs for treating cystic fibrosis (CF)?")
 # COMMAND ----------
 
 answer_question("What are the cystic fibrosis drugs that target the CFTR protein?")
-
-# COMMAND ----------
-
-

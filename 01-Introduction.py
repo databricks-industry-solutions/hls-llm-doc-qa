@@ -2,7 +2,7 @@
 # MAGIC %md
 # MAGIC # Biomedical Question Answering over Custom Datasets with 🦜️🔗 LangChain and Open Source LLMs on Hugging Face 🤗 
 # MAGIC
-# MAGIC Large Language Models produce some amazing results, chatting and answering questions with seeming intelligence. But how can you get LLMs to answer questions about _your_ specific datasets? Imagine answering questions based on your company's knowledge base, docs or Slack chats. The good news is that this is easy with open-source tooling and LLMs. This example shows how to apply [LangChain](https://python.langchain.com/en/latest/index.html), Hugging Face `transformers`, and open source LLMs such as [MPT-7b-Instruct](https://huggingface.co/mosaicml/mpt-7b-instruct) from MosaicML or [Falcon-7b-Instruct](https://huggingface.co/tiiuae/falcon-7b-instruct) from the Technology Innovation Institute. This example can make use of any text-generation LLM or even OpenAI with minor changes. In this case, the data set is a set of freely available published papers in PDF format about cystic fibrosis from PubMed, but could be any corpus of text.
+# MAGIC Large Language Models produce some amazing results, chatting and answering questions with seeming intelligence. But how can you get LLMs to answer questions about _your_ specific datasets? Imagine answering questions based on your company's knowledge base, docs or Slack chats. The good news is that this is easy with open-source tooling and LLMs. This example shows how to apply [LangChain](https://python.langchain.com/en/latest/index.html), Hugging Face `transformers`, and open source LLMs such as [DBRX-INSTRUCT](https://huggingface.co/databricks/dbrx-instruct) from Databricks or [Llama-7b-Instruct](https://huggingface.co/meta-llama/Llama-2-7b) from Meta. 
 
 # COMMAND ----------
 
@@ -48,7 +48,7 @@
 # MAGIC %md
 # MAGIC ## Cluster Setup
 # MAGIC
-# MAGIC - Run the next notebooks on a cluster with Databricks Runtime 13.0 ML GPU. It should work on 12.2 ML GPU as well.
-# MAGIC - To run this notebook's examples all that is needed is a single-node 'cluster', with a single A10 GPU (ex: `g5.4xlarge` on AWS). A100 instances work as well.
+# MAGIC - Run the next notebooks on a cluster with Databricks Runtime 14.3 LTS ML. It should work on 12.2 ML as well.
+# MAGIC - To run this notebook's examples with custom model deployment all that is needed is a single-node 'cluster', with a single A10 GPU (ex: `g5.4xlarge` on AWS). A100 instances work as well.
 # MAGIC
 # MAGIC We have provided code to create a sample cluster for this notebook. See the `./RUNME` notebook for instructions on how to use this automation.

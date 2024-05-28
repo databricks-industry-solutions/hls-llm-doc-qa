@@ -33,7 +33,7 @@
 dbutils.widgets.text("UC_Volume_Path", "hls_llm_qa_demo.data.pdf_docs")
 
 # which embeddings model we want to use. We are going to use the foundation model API, but you can use custom models (i.e. from HuggingFace), External Models (Azure OpenAI), etc.
-dbutils.widgets.text("Embeddings_Model", "bge-large-en")
+dbutils.widgets.text("Embeddings_Model", "databricks-bge-large-en")
 
 # publicly accessible bucket with PDFs for this demo
 dbutils.widgets.text("Source_Documents", "s3a://db-gtm-industry-solutions/data/hls/llm_qa/")
@@ -41,8 +41,8 @@ dbutils.widgets.text("Source_Documents", "s3a://db-gtm-industry-solutions/data/h
 # Location for the split documents to be saved  
 dbutils.widgets.text("Persisted_UC_Table_Location", "hls_llm_qa_demo.vse.hls_llm_qa_raw_docs")
 
-# Vector Search Endpoint Name - one-env-shared-endpoint-7, hls_llm_qa_demo_vse
-dbutils.widgets.text("Vector_Search_Endpoint", "one-env-shared-endpoint-7")
+# Vector Search Endpoint Name - , hls_llm_qa_demo_vse
+dbutils.widgets.text("Vector_Search_Endpoint", "VS_ENDPOINT")
 
 # Vector Index Name 
 dbutils.widgets.text("Vector_Index", "hls_llm_qa_demo.vse.hls_llm_qa_embeddings")
@@ -123,7 +123,6 @@ dbutils.fs.cp(source_pdfs, volume_path, True)
 
 dbutils.fs.ls(volume_path)
 
-
 # COMMAND ----------
 
 # MAGIC %md
@@ -159,10 +158,9 @@ len(docs)
 
 # MAGIC %md
 # MAGIC Here we are using a text splitter from LangChain to split our PDFs into manageable chunks. This is for a few reasons, primarily:
-# MAGIC - LLMs (currently) have a limited context length. MPT-7b-Instruct by default can only accept 2048 tokens (roughly words) in the prompt, although it can accept 4096 with a small settings change. This is rapidly changing, though, so keep an eye on it.
+# MAGIC - LLMs (currently) have a limited context length. DRBX by default has a context length of 32k tokens. tokens (roughly words) in the prompt.
 # MAGIC - When we create embeddings for these documents, an NLP model (sentence transformer) creates a numerical representation (a high-dimensional vector) of that chunk of text that captures the semantic meaning of what is being embedded. If we were to embed large documents, the NLP model would need to capture the meaning of the entire document in one vector; by splitting the document, we can capture the meaning of chunks throughout that document and retrieve only what is most relevant.
-# MAGIC - In this case, the embeddings model we use can except a very limited number of tokens. The default one we have selected in this notebook, [
-# MAGIC S-PubMedBert-MS-MARCO](https://huggingface.co/pritamdeka/S-PubMedBert-MS-MARCO), has also been finetuned on a PubMed dataset, so it is particularly good at generating embeddings for medical documents.
+# MAGIC - In this case, the embeddings model we use can except a very limited number of tokens. 
 # MAGIC - More info on embeddings: [Hugging Face: Getting Started with Embeddings](https://huggingface.co/blog/getting-started-with-embeddings)
 
 # COMMAND ----------
@@ -271,9 +269,9 @@ display(results)
 # MAGIC
 # MAGIC Now we can compose the database with a language model and prompting strategy to make a `langchain` chain that answers questions.
 # MAGIC
-# MAGIC - Load the Chroma DB
-# MAGIC - Instantiate an LLM, like Dolly here, but could be other models or even OpenAI models
-# MAGIC - Define how relevant texts are combined with a question into the LLM prompt
+# MAGIC - Load the Vector Search as a retriever.
+# MAGIC - Instantiate an LLM, here we use the Foundation Model APIs, but we also use other open source or even OpenAI models.
+# MAGIC - Define how relevant texts are combined with a question into the LLM prompt.
 
 # COMMAND ----------
 
@@ -302,7 +300,7 @@ retriever = get_retriever()
 similar_documents = retriever.get_relevant_documents("What is cystic fibrosis?")
 
 if similar_documents:
-    print(f"Relevant documents: {similar_documents[0]}")
+    display(f"Relevant documents: {similar_documents[0]}")
 
 # COMMAND ----------
 
