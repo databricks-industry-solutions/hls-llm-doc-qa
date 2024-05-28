@@ -32,19 +32,19 @@
 
 
 # which embeddings model we want to use. We are going to use the foundation model API, but you can use custom models (i.e. from HuggingFace), External Models (Azure OpenAI), etc.
-dbutils.widgets.text("Embeddings_Model", "bge-large-en")
+dbutils.widgets.text("Embeddings_Model", "databricks-bge-large-en")
 
 # which LLM model we want to use. We are going to use the foundation model API, but you can use custom models (i.e. from HuggingFace), External Models (Azure OpenAI), etc.
 dbutils.widgets.text("FMAPI_Model", "databricks-dbrx-instruct")
 
 # Location for the split documents to be saved  
-dbutils.widgets.text("Persisted_UC_Table_Location", "hls_llm_qa_demo_temp.vse.hls_llm_qa_raw_docs")
+dbutils.widgets.text("Persisted_UC_Table_Location", "hls_llm_qa_demo.vse.hls_llm_qa_raw_docs")
 
 # Vector Search Endpoint Name - one-env-shared-endpoint-7, hls_llm_qa_demo_vse
 dbutils.widgets.text("Vector_Search_Endpoint", "hls_llm_qa_demo_vse")
 
 # Vector Index Name 
-dbutils.widgets.text("Vector_Index", "hls_llm_qa_demo_temp.vse.hls_llm_qa_embeddings")
+dbutils.widgets.text("Vector_Index", "hls_llm_qa_demo.vse.hls_llm_qa_embeddings")
 
 # COMMAND ----------
 

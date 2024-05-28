@@ -6,7 +6,7 @@
 # MAGIC
 # MAGIC
 # MAGIC #
-# MAGIC 1. Organize your documents into a directory on DBFS or S3 (DBFS is easier but S3 works too)
+# MAGIC 1. Organize your documents into a Unity Catalog Volume
 # MAGIC     * In this demo we have preuploaded a set of PDFs from PubMed on S3, but your own documents will work the same way
 # MAGIC 2. Use LangChain to ingest those documents and split them into manageable chunks using a text splitter
 # MAGIC 3. Use a sentence transformer NLP model to create embeddings of those text chunks and store them in a vectorstore
@@ -71,14 +71,14 @@ volume_path = "/Volumes/hls_llm_qa_demo/data/pdf_docs"
 # MAGIC %sql
 # MAGIC -- Create Unity catalog if it does not exist
 # MAGIC -- Use IF NOT EXISTS clause to avoid errors if the catalog already exists
-# MAGIC CREATE CATALOG IF NOT EXISTS ${Catalog_Name};
+# MAGIC CREATE CATALOG IF NOT EXISTS ${Catalog_Name}
 
 # COMMAND ----------
 
 # MAGIC %sql
 # MAGIC -- Create Unity schema if it does not exist in the Unity catalog
 # MAGIC -- Use IF NOT EXISTS clause to avoid errors if the schema already exists
-# MAGIC CREATE SCHEMA IF NOT EXISTS ${Catalog_Name}.vse;
+# MAGIC CREATE SCHEMA IF NOT EXISTS ${Catalog_Name}.vse
 
 # COMMAND ----------
 
