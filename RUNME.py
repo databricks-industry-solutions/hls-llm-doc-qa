@@ -84,24 +84,12 @@ job_json = {
             {
                 "job_cluster_key": "hls_qa_cluster",
                 "notebook_task": {
-                    "notebook_path": f"03-Deploy-Llama-2-to-GPU-Serving"
+                    "notebook_path": f"03-LLM-Chain-with-FMAPI"
                 },
-                "task_key": "Finetune",
+                "task_key": "LLM-chain",
                 "depends_on": [
                     {
                         "task_key": "Data-prep"
-                    }
-                ]
-            },
-            {
-                "job_cluster_key": "hls_qa_cluster",
-                "notebook_task": {
-                    "notebook_path": f"04-LLM-Chain-with-GPU-Serving"
-                },
-                "task_key": "Deploy",
-                "depends_on": [
-                    {
-                        "task_key": "Finetune"
                     }
                 ]
             }
@@ -110,9 +98,9 @@ job_json = {
             {
               "job_cluster_key": "hls_qa_cluster",
               "new_cluster": {
-                  "spark_version": "13.2.x-gpu-ml-scala2.12",
+                  "spark_version": "14.3.x-cpu-ml-scala2.12",
                   "num_workers": 1,
-                  "node_type_id": {"AWS": "g5.4xlarge", "MSA": "Standard_NC4as_T4_v3", "GCP": "a2-highgpu-1g"}, 
+                  "node_type_id": {"AWS": "i3.4xlarge", "MSA": "Standard_D16s_v3", "GCP": "n1-standard-32"}, 
                   "custom_tags": {
                         "usage": "solacc_testing"
                     },
