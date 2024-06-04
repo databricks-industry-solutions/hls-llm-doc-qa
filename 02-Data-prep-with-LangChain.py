@@ -2,14 +2,14 @@
 # MAGIC %md
 # MAGIC ## Document Ingestion and Preparation
 # MAGIC
-# MAGIC <img style="float: right" width="800px" src="https://raw.githubusercontent.com/databricks-industry-solutions/hls-llm-doc-qa/basic-qa-LLM-HLS/images/data-prep.jpeg?token=GHSAT0AAAAAACBNXSB4IK2XJS37QU6HCJCEZEBL3TA">
+# MAGIC <img style="float: right" width="500px" src="https://raw.githubusercontent.com/databricks-industry-solutions/hls-llm-doc-qa/basic-qa-LLM-HLS/images/data-prep.jpeg?token=GHSAT0AAAAAACBNXSB4IK2XJS37QU6HCJCEZEBL3TA">
 # MAGIC
 # MAGIC
 # MAGIC #
-# MAGIC 1. Organize your documents into a Unity Catalog Volume
+# MAGIC 1. Organize your documents into a directory on DBFS or S3 (DBFS is easier but S3 works too)
 # MAGIC     * In this demo we have preuploaded a set of PDFs from PubMed on S3, but your own documents will work the same way
 # MAGIC 2. Use LangChain to ingest those documents and split them into manageable chunks using a text splitter
-# MAGIC 3. Use a sentence transformer NLP model to create embeddings of those text chunks and store them in a vectorstore
+# MAGIC 3. Use a BAAI general embedding model to create embeddings of those text chunks and store them in a Databricks Vector Search index
 # MAGIC     * Embeddings are basically creating a high-dimension vector encoding the semantic meaning of a chunk of text
 # MAGIC
 
@@ -29,61 +29,62 @@
 
 # COMMAND ----------
 
-# ADD YOUR CATALOG NAME HERE 
+# Target catalog name
+dbutils.widgets.text("catalog_name", "hls_llm_qa_demo")
+# Target vector search schema name
+dbutils.widgets.text("vector_search_schema_name", "hls_llm_vse")
 
-dbutils.widgets.text("Catalog_Name", "hls_llm_qa_demo")
-
-catalog_name = dbutils.widgets.get("Catalog_Name")
+catalog_name = dbutils.widgets.get("catalog_name")
+vector_search_schema_name = dbutils.widgets.get("vector_search_schema_name")
 
 # COMMAND ----------
 
-# where you want the PDFs to be saved in your environment
-dbutils.widgets.text("UC_Volume_Path", f"{catalog_name}.data.pdf_docs")
+# Where you want the PDFs to be saved in your environment
+dbutils.widgets.text("uc_volume_path", f"{catalog_name}.data.pdf_docs")
 
-# which embeddings model we want to use. We are going to use the foundation model API, but you can use custom models (i.e. from HuggingFace), External Models (Azure OpenAI), etc.
-dbutils.widgets.text("Embeddings_Model", "databricks-bge-large-en")
+# Which embeddings model we want to use. We are going to use the foundation model API, but you can use custom models (i.e. from HuggingFace), External Models (Azure OpenAI), etc.
+dbutils.widgets.text("embedding_model_name", "databricks-bge-large-en")
 
-# publicly accessible bucket with PDFs for this demo
-dbutils.widgets.text("Source_Documents", "s3a://db-gtm-industry-solutions/data/hls/llm_qa/")
+# Publicly accessible bucket with PDFs for this demo
+dbutils.widgets.text("source_documents", "s3a://db-gtm-industry-solutions/data/hls/llm_qa/")
 
 # Location for the split documents to be saved  
-dbutils.widgets.text("Persisted_UC_Table_Location", f"{catalog_name}.vse.hls_llm_qa_raw_docs")
+dbutils.widgets.text("persisted_uc_table_path", f"{catalog_name}.{vector_search_schema_name}.hls_llm_qa_raw_docs")
 
-# Vector Search Endpoint Name - , hls_llm_qa_demo_vse
-dbutils.widgets.text("Vector_Search_Endpoint", "VS_ENDPOINT")
+# Vector Search endpoint name
+dbutils.widgets.text("vector_search_endpoint_name", "hls_llm_qa_vse")
 
-# Vector Index Name 
-dbutils.widgets.text("Vector_Index", f"{catalog_name}.vse.hls_llm_qa_embeddings")
-
-# Target VSE Schema Name
-dbutils.widgets.text("Vse_Schema_Name", "vse")
+# Vector index name 
+dbutils.widgets.text("vector_index", f"{catalog_name}.{vector_search_schema_name}.hls_llm_qa_embeddings")
 
 # COMMAND ----------
 
-#get widget values
-pdf_path = dbutils.widgets.get("UC_Volume_Path")
-source_pdfs = dbutils.widgets.get("Source_Documents")
-embeddings_model = dbutils.widgets.get("Embeddings_Model")
-vector_search_endpoint_name = dbutils.widgets.get("Vector_Search_Endpoint")
-vector_index_name = dbutils.widgets.get("Vector_Index")
-UC_table_save_location = dbutils.widgets.get("Persisted_UC_Table_Location")
+#get widget values and store in Python variables
 
-# TEMORARY - NEED TO ADD STRING LOGIC TO GENERATE:
-volume_path = "/Volumes/hls_llm_qa_demo/data/pdf_docs"
+uc_volume_path = dbutils.widgets.get("uc_volume_path")
+source_pdfs = dbutils.widgets.get("source_documents")
+embeddings_model = dbutils.widgets.get("embedding_model_name")
+vector_search_endpoint_name = dbutils.widgets.get("vector_search_endpoint_name")
+vector_index_name = dbutils.widgets.get("vector_index")
+UC_table_save_location = dbutils.widgets.get("persisted_uc_table_path")
+
+# Volume path string uses slashes with the saved uc_volume_path
+target_volume_path = f"/Volumes/{catalog_name}/data/pdf_docs"
 
 # COMMAND ----------
 
 # MAGIC %sql
 # MAGIC -- Create Unity catalog if it does not exist
 # MAGIC -- Use IF NOT EXISTS clause to avoid errors if the catalog already exists
-# MAGIC CREATE CATALOG IF NOT EXISTS ${Catalog_Name}
+# MAGIC CREATE CATALOG IF NOT EXISTS ${catalog_name}
 
 # COMMAND ----------
 
 # MAGIC %sql
 # MAGIC -- Create Unity schema if it does not exist in the Unity catalog
 # MAGIC -- Use IF NOT EXISTS clause to avoid errors if the schema already exists
-# MAGIC CREATE SCHEMA IF NOT EXISTS ${Catalog_Name}.vse
+# MAGIC
+# MAGIC CREATE SCHEMA IF NOT EXISTS ${catalog_name}.${vector_search_schema_name};
 
 # COMMAND ----------
 
@@ -100,13 +101,13 @@ volume_path = "/Volumes/hls_llm_qa_demo/data/pdf_docs"
 
 # MAGIC %sql
 # MAGIC -- Create an external volume under the newly created directory
-# MAGIC CREATE SCHEMA IF NOT EXISTS ${Catalog_Name}.data
+# MAGIC CREATE SCHEMA IF NOT EXISTS ${catalog_name}.data
 
 # COMMAND ----------
 
 # MAGIC %sql
 # MAGIC -- Create an external volume under the newly created directory
-# MAGIC CREATE VOLUME IF NOT EXISTS ${UC_Volume_Path}
+# MAGIC CREATE VOLUME IF NOT EXISTS ${uc_volume_path}
 # MAGIC  COMMENT 'This is the managed volume for the PDF documents'
 
 # COMMAND ----------
@@ -115,7 +116,7 @@ import os
 import shutil
 
 # Copy the files from S3 to the Unity Catalog Volumes  (s3a://db-gtm-industry-solutions/data/hls/llm_qa/)
-dbutils.fs.cp(source_pdfs, volume_path, True)
+dbutils.fs.cp(source_pdfs, target_volume_path, True)
 
 # COMMAND ----------
 
@@ -126,7 +127,7 @@ dbutils.fs.cp(source_pdfs, volume_path, True)
 
 # COMMAND ----------
 
-dbutils.fs.ls(volume_path)
+dbutils.fs.ls(target_volume_path)
 
 # COMMAND ----------
 
@@ -139,7 +140,7 @@ dbutils.fs.ls(volume_path)
 # MAGIC - Use `langchain` to reading directly from PDFs, although LangChain also supports txt, HTML, Word docs, GDrive, PDFs, etc.
 # MAGIC - Create a Databricks Vector Search endpoint to have a persistent vector index.
 # MAGIC - Use the Foundation Model APIs to generate the embeddings to sync against the vector index.
-# MAGIC - Sync the vector index to populate for our rag implementation.
+# MAGIC - Sync the vector index to populate for our RAG implementation.
 
 # COMMAND ----------
 
@@ -153,7 +154,7 @@ from langchain.docstore.document import Document
 from langchain.document_loaders import PyPDFDirectoryLoader
 
 # Load directly from Unity Catalog Volumes
-loader_path = volume_path
+loader_path = target_volume_path
 
 pdf_loader = PyPDFDirectoryLoader(loader_path)
 docs = pdf_loader.load()
@@ -163,9 +164,9 @@ len(docs)
 
 # MAGIC %md
 # MAGIC Here we are using a text splitter from LangChain to split our PDFs into manageable chunks. This is for a few reasons, primarily:
-# MAGIC - LLMs (currently) have a limited context length. DRBX by default has a context length of 32k tokens. tokens (roughly words) in the prompt.
-# MAGIC - When we create embeddings for these documents, an NLP model (sentence transformer) creates a numerical representation (a high-dimensional vector) of that chunk of text that captures the semantic meaning of what is being embedded. If we were to embed large documents, the NLP model would need to capture the meaning of the entire document in one vector; by splitting the document, we can capture the meaning of chunks throughout that document and retrieve only what is most relevant.
-# MAGIC - In this case, the embeddings model we use can except a very limited number of tokens. 
+# MAGIC - LLMs (currently) have a limited context length. DRBX by default has a context length of 32k tokens (roughly words) in the prompt.
+# MAGIC - When we create embeddings for these documents, an NLP model (databricks-bge-large-en) creates a numerical representation (a high-dimensional vector) of that chunk of text that captures the semantic meaning of what is being embedded. If we were to embed large documents, the NLP model would need to capture the meaning of the entire document in one vector; by splitting the document, we can capture the meaning of chunks throughout that document and retrieve only what is most relevant.
+# MAGIC - In this case, the embeddings model we use can accept a limited number of tokens (max length for bge is limited to 512).
 # MAGIC - More info on embeddings: [Hugging Face: Getting Started with Embeddings](https://huggingface.co/blog/getting-started-with-embeddings)
 
 # COMMAND ----------
@@ -174,8 +175,8 @@ len(docs)
 from langchain.text_splitter import TokenTextSplitter
 
 # this is splitting into chunks based on a fixed number of tokens
-# the embeddings model we use below can take a maximum of 128 tokens (and truncates beyond that) so we keep our chunks at that max size
-text_splitter = TokenTextSplitter(chunk_size=128, chunk_overlap=32)
+# the embeddings model we use below can take a maximum of 512 tokens (and truncates beyond that) so we keep our chunks at that max size
+text_splitter = TokenTextSplitter(chunk_size=512, chunk_overlap=32)
 documents = text_splitter.split_documents(docs)
 
 # COMMAND ----------
@@ -185,10 +186,10 @@ display(documents)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC Now that we split the documents into more manageable chunks. We will now set up **Databricks Vector Search** with a **Direct Vector Access Index** which will be used with Langchain in our RAG architecture. 
+# MAGIC Now that we split the documents into more manageable chunks. We will now set up **Databricks Vector Search** with a **Delta Sync Index** which will be used with Langchain in our RAG architecture. 
 # MAGIC - We first need to create a dataframe with an id column to be used with Vector Search.
-# MAGIC - We will then calculate the embeddings using BGE
-# MAGIC - Finally we will save this in our Vector Search as an index to be used for RAG.
+# MAGIC - We will then calculate the embeddings using databricks-bge-large-en.
+# MAGIC - Finally we will save this in our Vector Search as an index to be used for our QA Chain with the VS retriever. 
 
 # COMMAND ----------
 
@@ -200,7 +201,7 @@ documents_with_id = spark.createDataFrame(documents).withColumn("metadata", col(
 # Write the dataframe to Unity Catalog to be used as source table
 documents_with_id.write.option("mergeSchema", "true").mode("overwrite").format("delta").saveAsTable(UC_table_save_location)
 
-# display(documents_with_id)
+display(documents_with_id)
 
 # COMMAND ----------
 
@@ -209,28 +210,54 @@ from databricks.vector_search.client import VectorSearchClient
 # Automatically generates a PAT Token for authentication
 client = VectorSearchClient()
 
-# Uses the service principal token for authentication
+# Uses the service principal token for authentication if needed
 # client = VectorSearch(service_principal_client_id=<CLIENT_ID>,service_principal_client_secret=<CLIENT_SECRET>)
 
-if vector_search_endpoint_name not in [item['name'] for item in client.list_endpoints()['endpoints']]:
-  print("Creating new VSE " + vector_search_endpoint_name)
-  client.create_endpoint(
-    name= vector_search_endpoint_name,
-    endpoint_type="STANDARD"
-  )
-else: 
-  print("Vector search endpoint: " + vector_search_endpoint_name + " already exists!")
+# Check if there are endpoints and potential conflicts. 
+if client.list_endpoints():
+    if vector_search_endpoint_name not in [
+        item["name"] for item in client.list_endpoints()["endpoints"]
+    ]:
+        print("Creating new VSE " + vector_search_endpoint_name)
+        client.create_endpoint(
+            name=vector_search_endpoint_name, endpoint_type="STANDARD"
+        )
+    else:
+        print(
+            "Vector search endpoint: "
+            + vector_search_endpoint_name
+            + " already exists!"
+        )
+else:
+    print("Creating new VSE " + vector_search_endpoint_name)
+    client.create_endpoint(name=vector_search_endpoint_name, endpoint_type="STANDARD")
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC ALTER TABLE ${Persisted_UC_Table_Location} SET TBLPROPERTIES (delta.enableChangeDataFeed = true)
+# MAGIC -- Must have Change Data Feed enabled on the UC table in order to use it as the source for an index on Vector Search. 
+# MAGIC
+# MAGIC ALTER TABLE ${persisted_uc_table_path} SET TBLPROPERTIES (delta.enableChangeDataFeed = true)
 
 # COMMAND ----------
 
 # DBTITLE 1,Check if the endpoint already exists , otherwise create a new one
-if vector_index_name not in [item['name'] for item in client.list_indexes(vector_search_endpoint_name)['vector_indexes']]:
-  print("Creating vector index: " + vector_index_name)
+if client.list_indexes(vector_search_endpoint_name)['vector_indexes']: 
+  if vector_index_name not in [item['name'] for item in client.list_indexes(vector_search_endpoint_name)['vector_indexes']]:
+    print("Creating vector index: " + vector_index_name)
+    index = client.create_delta_sync_index(
+    endpoint_name= vector_search_endpoint_name,
+    source_table_name= UC_table_save_location,
+    index_name= vector_index_name,
+    pipeline_type='TRIGGERED',
+    primary_key="id",
+    embedding_source_column= "page_content",
+    embedding_model_endpoint_name= embeddings_model
+  )
+  else: 
+    print("Vector index: " + vector_index_name + " already exists!")
+else:
+  print("No existing indexes, Creating vector index: " + vector_index_name)
   index = client.create_delta_sync_index(
   endpoint_name= vector_search_endpoint_name,
   source_table_name= UC_table_save_location,
@@ -239,10 +266,7 @@ if vector_index_name not in [item['name'] for item in client.list_indexes(vector
   primary_key="id",
   embedding_source_column= "page_content",
   embedding_model_endpoint_name= embeddings_model
-)
-else: 
-  print("Vector index: " + vector_index_name + " already exists!")
-
+  )
 
 # COMMAND ----------
 
@@ -309,4 +333,5 @@ if similar_documents:
 
 # COMMAND ----------
 
-
+# MAGIC %md
+# MAGIC ### Now we are done with the data prep portion and can move on to using an LLM within a full RAG chain! 
