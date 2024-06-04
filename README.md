@@ -3,13 +3,14 @@
 [![CLOUD](https://img.shields.io/badge/CLOUD-ALL-blue?logo=googlecloud&style=for-the-badge)](https://cloud.google.com/databricks)
 [![POC](https://img.shields.io/badge/POC-10_days-green?style=for-the-badge)](https://databricks.com/try-databricks)
 
-# Biomedical Question Answering over Custom Datasets with 🦜️🔗 LangChain and Llama 2 from Hugging Face 🤗 
+# Biomedical Question Answering over Custom Datasets with 🦜️🔗 LangChain and DBRX Instruct from Hugging Face 🤗 
 
-Large Language Models produce some amazing results, chatting and answering questions with seeming intelligence. But how can you get LLMs to answer questions about _your_ specific datasets? Imagine answering questions based on your company's knowledge base, docs or Slack chats. The good news is that this is easy with open-source tooling and LLMs. This example shows how to apply [LangChain](https://python.langchain.com/en/latest/index.html), Hugging Face `transformers`, and open source LLMs such as [Llama-2](https://huggingface.co/meta-llama/Llama-2-7b-hf) from Meta. This example can make use of any text-generation LLM or even OpenAI with minor changes. In this case, the data set is a set of freely available published papers in PDF format about cystic fibrosis from PubMed, but could be any corpus of text.
+Large Language Models produce some amazing results, chatting and answering questions with seeming intelligence. But how can you get LLMs to answer questions about _your_ specific datasets? Imagine answering questions based on your company's knowledge base, docs or Slack chats. The good news is that this is easy with open-source tooling and LLMs. This example shows how to apply [LangChain](https://python.langchain.com/en/latest/index.html), Hugging Face `transformers`, and open source LLMs such as [DBRX](https://huggingface.co/spaces/databricks/dbrx-instruct) from Databricks. This example can make use of any text-generation LLM or even OpenAI with minor changes. In this case, the data set is a set of freely available published papers in PDF format about cystic fibrosis from PubMed, but could be any corpus of text.
 
 ___
-<james.mccall@databricks.com>
+<james.mccall@databricks.com> 
 
+<will.smith@databricks.com>   
 ___
 
 <img style="margin: auto; display: block" width="1200px" src="https://raw.githubusercontent.com/databricks-industry-solutions/hls-llm-doc-qa/hls-llm-qa-gpu/images/solution-overview.jpeg">
