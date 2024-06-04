@@ -66,7 +66,7 @@ source_pdfs = dbutils.widgets.get("source_documents")
 embeddings_model = dbutils.widgets.get("embedding_model_name")
 vector_search_endpoint_name = dbutils.widgets.get("vector_search_endpoint_name")
 vector_index_name = dbutils.widgets.get("vector_index")
-UC_table_save_location = dbutils.widgets.get("persisted_uc_table_path")
+uc_table_save_location = dbutils.widgets.get("persisted_uc_table_path")
 
 # Volume path string uses slashes with the saved uc_volume_path
 target_volume_path = f"/Volumes/{catalog_name}/data/pdf_docs"
@@ -199,7 +199,7 @@ from pyspark.sql.functions import col, monotonically_increasing_id
 documents_with_id = spark.createDataFrame(documents).withColumn("metadata", col("metadata").cast("string")).withColumn("id", monotonically_increasing_id())
 
 # Write the dataframe to Unity Catalog to be used as source table
-documents_with_id.write.option("mergeSchema", "true").mode("overwrite").format("delta").saveAsTable(UC_table_save_location)
+documents_with_id.write.option("mergeSchema", "true").mode("overwrite").format("delta").saveAsTable(uc_table_save_location)
 
 display(documents_with_id)
 
@@ -247,7 +247,7 @@ if client.list_indexes(vector_search_endpoint_name)['vector_indexes']:
     print("Creating vector index: " + vector_index_name)
     index = client.create_delta_sync_index(
     endpoint_name= vector_search_endpoint_name,
-    source_table_name= UC_table_save_location,
+    source_table_name= uc_table_save_location,
     index_name= vector_index_name,
     pipeline_type='TRIGGERED',
     primary_key="id",
@@ -260,7 +260,7 @@ else:
   print("No existing indexes, Creating vector index: " + vector_index_name)
   index = client.create_delta_sync_index(
   endpoint_name= vector_search_endpoint_name,
-  source_table_name= UC_table_save_location,
+  source_table_name= uc_table_save_location,
   index_name= vector_index_name,
   pipeline_type='TRIGGERED',
   primary_key="id",

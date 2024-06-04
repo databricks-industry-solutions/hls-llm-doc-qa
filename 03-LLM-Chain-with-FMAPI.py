@@ -2,16 +2,17 @@
 # MAGIC %md
 # MAGIC ## Using an LLM Served on Databricks Model Serving: A LangChain app
 # MAGIC
-# MAGIC <img style="float: right" width="800px" src="https://raw.githubusercontent.com/databricks-industry-solutions/hls-llm-doc-qa/basic-qa-LLM-HLS/images/llm-chain.jpeg?token=GHSAT0AAAAAACBNXSB4UGOIIYZJ37LBI4MOZEBL4LQ">
+# MAGIC <img style="float: right" width="500px" src="https://raw.githubusercontent.com/databricks-industry-solutions/hls-llm-doc-qa/basic-qa-LLM-HLS/images/llm-chain.jpeg?token=GHSAT0AAAAAACBNXSB4UGOIIYZJ37LBI4MOZEBL4LQ">
 # MAGIC
 # MAGIC #
 # MAGIC Construct a chain using LangChain such that when a user submits a question to the chain the following steps happen:
-# MAGIC 1. Similarity search for your question on the vectorstore, i.e. “which chunks of text have similar context/meaning as the question?”
+# MAGIC 1. Similarity search for your question on the Vector Search index, i.e. “which chunks of text have similar context/meaning as the question?”
 # MAGIC 2. Retrieve the top `k` chunks
 # MAGIC 3. Submit relevant chunks and your original question together to the LLM
 # MAGIC 4. LLM answers the question with the relevant chunks as a reference
 # MAGIC
 # MAGIC We will also need to define some critical parameters, such as which LLM to use, how many text chunks (`k`) to retrieve, and model performance parameters.
+# MAGIC
 # MAGIC
 
 # COMMAND ----------
@@ -30,33 +31,43 @@
 
 # COMMAND ----------
 
+# Target catalog name
+dbutils.widgets.text("catalog_name", "hls_llm_qa_demo")
+# Target vector search schema name
+dbutils.widgets.text("vector_search_schema_name", "hls_llm_vse")
 
-# which embeddings model we want to use. We are going to use the foundation model API, but you can use custom models (i.e. from HuggingFace), External Models (Azure OpenAI), etc.
-dbutils.widgets.text("Embeddings_Model", "databricks-bge-large-en")
+catalog_name = dbutils.widgets.get("catalog_name")
+vector_search_schema_name = dbutils.widgets.get("vector_search_schema_name")
+
+# COMMAND ----------
+
+# Which embeddings model we want to use. We are going to use the foundation model API, but you can use custom models (i.e. from HuggingFace), External Models (Azure OpenAI), etc.
+dbutils.widgets.text("embedding_model_name", "databricks-bge-large-en")
 
 # which LLM model we want to use. We are going to use the foundation model API, but you can use custom models (i.e. from HuggingFace), External Models (Azure OpenAI), etc.
-dbutils.widgets.text("FMAPI_Model", "databricks-dbrx-instruct")
+dbutils.widgets.text("llm_model", "databricks-dbrx-instruct")
 
 # Location for the split documents to be saved  
-dbutils.widgets.text("Persisted_UC_Table_Location", "hls_llm_qa_demo.vse.hls_llm_qa_raw_docs")
+dbutils.widgets.text("persisted_uc_table_path", f"{catalog_name}.{vector_search_schema_name}.hls_llm_qa_raw_docs")
 
-# Vector Search Endpoint Name - VS_ENDPOINT, hls_llm_qa_demo_vse
-dbutils.widgets.text("Vector_Search_Endpoint", "VS_ENDPOINT")
 
-# Vector Index Name 
-dbutils.widgets.text("Vector_Index", "hls_llm_qa_demo.vse.hls_llm_qa_embeddings")
+# Vector Search endpoint name
+dbutils.widgets.text("vector_search_endpoint_name", "hls_llm_qa_vse")
+
+# Vector index name 
+dbutils.widgets.text("vector_index", f"{catalog_name}.{vector_search_schema_name}.hls_llm_qa_embeddings")
 
 # COMMAND ----------
 
 #get widget values
-model_endpoint_name= dbutils.widgets.get("FMAPI_Model")
+model_endpoint_name= dbutils.widgets.get("llm_model")
 
 # dbutils.widgets.get('model_name_from_model_serving')
-embeddings_model = dbutils.widgets.get("Embeddings_Model")
+embeddings_model = dbutils.widgets.get("embedding_model_name")
+vector_search_endpoint_name = dbutils.widgets.get("vector_search_endpoint_name")
+vector_index_name = dbutils.widgets.get("vector_index")
 
-vector_search_endpoint_name = dbutils.widgets.get("Vector_Search_Endpoint")
-vector_index_name = dbutils.widgets.get("Vector_Index")
-UC_table_save_location = dbutils.widgets.get("Persisted_UC_Table_Location")
+uc_table_save_location = dbutils.widgets.get("persisted_uc_table_path")
 
 # COMMAND ----------
 
@@ -72,6 +83,7 @@ UC_table_save_location = dbutils.widgets.get("Persisted_UC_Table_Location")
 # COMMAND ----------
 
 from databricks.vector_search.client import VectorSearchClient
+
 vsc = VectorSearchClient()
 
 vs_index = vsc.get_index(endpoint_name= vector_search_endpoint_name, index_name= vector_index_name)
@@ -136,7 +148,7 @@ llm = Databricks(endpoint_name="databricks-dbrx-instruct", transform_input_fn=tr
 #if you want answers to generate faster, set the number of tokens above to a smaller number
 prompt = "What is cystic fibrosis?"
 
-displayHTML(llm(prompt))
+displayHTML(llm.invoke(prompt))
 
 # COMMAND ----------
 

@@ -17,16 +17,18 @@ ___
 
 ___
 
-&copy; 2022 Databricks, Inc. All rights reserved. The source in this notebook is provided subject to the Databricks License [https://databricks.com/db-license-source].  All included or referenced third party libraries are subject to the licenses set forth below.
+&copy; 2024 Databricks, Inc. All rights reserved. The source in this notebook is provided subject to the Databricks License [https://databricks.com/db-license-source].  All included or referenced third party libraries are subject to the licenses set forth below.
 
-| library                                | description             | license    | source                                              |
+| core libraries                                | description             | license    | source                                              |
 |----------------------------------------|-------------------------|------------|-----------------------------------------------------|
 | transformers                                 | Transformers ML     | Apache 2.0        | https://github.com/huggingface/transformers                      |
-| sentence-transformers      | Embeddings with BERT    | Apache 2.0      | https://github.com/UKPLab/sentence-transformers  |
 | langchain                                 | LLM Applications      | MIT        | https://github.com/hwchase17/langchain                      |
-| chromadb                                 | Embedding Database      | Apache 2.0        | https://github.com/chroma-core/chroma                      |
 | pypdf                                 | Reading PDF files      | Custom Open Source        | https://github.com/py-pdf/pypdf                      |
 | pycryptodome                                 | Cryptographic library for Python      | BSD 2-Clause        | https://github.com/Legrandin/pycryptodome                      |
+
+| local model libraries                                | description             | license    | source                                              |
+|----------------------------------------|-------------------------|------------|-----------------------------------------------------|
+| sentence-transformers      | Embeddings with BERT    | Apache 2.0      | https://github.com/UKPLab/sentence-transformers  |
 | accelerate                                 | Train and use PyTorch models with multi-GPU, TPU, mixed-precision      | Apache 2.0        | https://github.com/huggingface/accelerate                      |
 | unstructured                                 | Build custom preprocessing pipelines for ML      | Apache 2.0        | https://github.com/yaml/pyyaml                      |
 | sacremoses                                 | Tokenizer, truecaser and normalizer      | MIT        | https://github.com/hplt-project/sacremoses                      |
