@@ -29,8 +29,16 @@
 
 # COMMAND ----------
 
+# ADD YOUR CATALOG NAME HERE 
+
+dbutils.widgets.text("Catalog_Name", "hls_llm_qa_demo")
+
+catalog_name = dbutils.widgets.get("Catalog_Name")
+
+# COMMAND ----------
+
 # where you want the PDFs to be saved in your environment
-dbutils.widgets.text("UC_Volume_Path", "hls_llm_qa_demo.data.pdf_docs")
+dbutils.widgets.text("UC_Volume_Path", f"{catalog_name}.data.pdf_docs")
 
 # which embeddings model we want to use. We are going to use the foundation model API, but you can use custom models (i.e. from HuggingFace), External Models (Azure OpenAI), etc.
 dbutils.widgets.text("Embeddings_Model", "databricks-bge-large-en")
@@ -39,16 +47,13 @@ dbutils.widgets.text("Embeddings_Model", "databricks-bge-large-en")
 dbutils.widgets.text("Source_Documents", "s3a://db-gtm-industry-solutions/data/hls/llm_qa/")
 
 # Location for the split documents to be saved  
-dbutils.widgets.text("Persisted_UC_Table_Location", "hls_llm_qa_demo.vse.hls_llm_qa_raw_docs")
+dbutils.widgets.text("Persisted_UC_Table_Location", f"{catalog_name}.vse.hls_llm_qa_raw_docs")
 
 # Vector Search Endpoint Name - , hls_llm_qa_demo_vse
 dbutils.widgets.text("Vector_Search_Endpoint", "VS_ENDPOINT")
 
 # Vector Index Name 
-dbutils.widgets.text("Vector_Index", "hls_llm_qa_demo.vse.hls_llm_qa_embeddings")
-
-# Target Catalog Name
-dbutils.widgets.text("Catalog_Name", "hls_llm_qa_demo")
+dbutils.widgets.text("Vector_Index", f"{catalog_name}.vse.hls_llm_qa_embeddings")
 
 # Target VSE Schema Name
 dbutils.widgets.text("Vse_Schema_Name", "vse")

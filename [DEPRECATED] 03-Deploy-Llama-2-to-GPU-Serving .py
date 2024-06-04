@@ -304,7 +304,7 @@ endpoint_config = EndpointCoreConfigInput(
             workload_size="Small",
             scale_to_zero_enabled=True,
             environment_vars={
-                "DATABRICKS_TOKEN": "{{secrets/dbdemos/rag_sp_token}}",  # <scope>/<secret> that contains an access token
+                "DATABRICKS_TOKEN": "{{secrets/scope/token}}",  # <scope>/<secret> that contains an access token
             }
         )
     ]
@@ -319,12 +319,3 @@ if existing_endpoint == None:
 else:
     print(f"Updating the endpoint {serving_endpoint_name} to version {latest_model_version}, this will take a few minutes to package and deploy the endpoint...")
     w.serving_endpoints.update_config_and_wait(served_models=endpoint_config.served_models, name=serving_endpoint_name)
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC Once the model serving endpoint is ready, you can query it easily with LangChain (see `04-LLM-Chain-with-GPU-Serving` for example code) running in the same workspace.
-
-# COMMAND ----------
-
-
