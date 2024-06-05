@@ -4,12 +4,12 @@
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC # Manage Llama-2-7B-Chat (base model) with MLFlow on Databricks
+# MAGIC # Manage Llama-3-8B-Instruct with MLFlow on Databricks
 # MAGIC
-# MAGIC [Llama 2](https://huggingface.co/meta-llama) is a collection of pretrained and fine-tuned generative text models ranging in scale from 7 billion to 70 billion parameters. It is trained with 2T tokens and supports context length window upto 4K tokens. [Llama-2-7b-chat-hf](https://huggingface.co/meta-llama/Llama-2-7b-chat-hf) is the 7B fine-tuned model, optimized for dialogue use cases and converted for the Hugging Face Transformers format.
+# MAGIC Meta developed and released the Meta Llama 3 family of large language models (LLMs), a collection of pretrained and instruction tuned generative text models in 8 and 70B sizes. The Llama 3 instruction tuned models are optimized for dialogue use cases and outperform many of the available open source chat models on common industry benchmarks. Further, in developing these models, we took great care to optimize helpfulness and safety. [Llama-3-8b-instruct](https://huggingface.co/meta-llama/Meta-Llama-3-8B-Instruct) is the 8B fine-tuned model, optimized for dialogue use cases and converted for the Hugging Face Transformers format.
 # MAGIC
 # MAGIC Environment for this notebook:
-# MAGIC - Runtime: 13.2 GPU ML Runtime
+# MAGIC - Runtime: 14.3 GPU ML Runtime
 # MAGIC - Instance: `g5.4xlarge` on AWS
 # MAGIC
 # MAGIC
@@ -25,36 +25,36 @@
 # COMMAND ----------
 
 # MAGIC %pip install --upgrade "mlflow-skinny[databricks]>=2.4.1"
-# MAGIC %pip install databricks-sdk==0.12.0 
-# MAGIC %pip install safetensors
+# MAGIC %pip install --upgrade  databricks-sdk
+# MAGIC %pip install --upgrade safetensors
 # MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
 
 # where you want the PDFs to be saved in your environment
-dbutils.widgets.text("Model_Schema_Path", "hls_llm_qa_demo_temp.hls_demo_models")
+dbutils.widgets.text("model_schema_path", "hls_llm_qa_demo.hls_demo_models")
 
 # which embeddings model from Hugging Face 🤗  you would like to use; for biomedical applications we have been using this model recently
 # also worth trying this model for embeddings for comparison: pritamdeka/BioBERT-mnli-snli-scinli-scitail-mednli-stsb
-dbutils.widgets.text("Model_Path", "hls_llm_qa_demo_temp.hls_demo_models.hls_llm_qa_model")
+dbutils.widgets.text("model_path", "hls_llm_qa_demo.hls_demo_models.hls_llm_qa_model")
 
 # where you want the vectorstore to be persisted across sessions, so that you don't have to regenerate
-dbutils.widgets.text("Model_Serving_Path", "hls_llm_qa_temp_model_endpoint")
+dbutils.widgets.text("model_serving_path", "hls_llm_qa_model_endpoint")
 
 # COMMAND ----------
 
-model_schema_path = dbutils.widgets.get("Model_Schema_Path")
-model_path = dbutils.widgets.get("Model_Path")
-model_serving_path = dbutils.widgets.get("Model_Serving_Path")
+model_schema_path = dbutils.widgets.get("model_schema_path")
+model_path = dbutils.widgets.get("model_path")
+model_serving_path = dbutils.widgets.get("model_serving_path")
 
 # COMMAND ----------
 
 from huggingface_hub import login
 
-# Login to Huggingface to get access to the model if you use the official version of Llama 2
-# login(token=dbutils.secrets.get('solution-accelerator-cicd', 'huggingface'))
+# Login to Huggingface to get access to the model if you use the official version of Llama 3
+login(token=dbutils.secrets.get('solution-accelerator-cicd', 'huggingface'))
 
-login(token=dbutils.secrets.get("SECRET_SCOPE", "SECRET"))
+# login(token="PERSONAL ACCESS TOKEN")
 
 # COMMAND ----------
 
@@ -75,10 +75,10 @@ os.environ['DATABRICKS_TOKEN'] = dbutils.secrets.get([SECRET_SCOPE], [SECRET])
 
 # COMMAND ----------
 
-# it is suggested to pin the revision commit hash and not change it for reproducibility because the uploader might change the model afterwards; you can find the commmit history of llamav2-7b-chat in https://huggingface.co/meta-llama/Llama-2-7b-chat-hf/commits/main
+# it is suggested to pin the revision commit hash and not change it for reproducibility because the uploader might change the model afterwards; you can find the commmit history of llama-3-8b-instruct in https://huggingface.co/meta-llama/Meta-Llama-3-8B-Instruct
 
-model_id = "meta-llama/Llama-2-7b-chat-hf" # official version, gated (needs login to Hugging Face)
-revision = "01622a9d125d924bd828ab6c72c995d5eda92b8e"
+model_id = "meta-llama/Meta-Llama-3-8B-Instruct" # official version, gated (needs login to Hugging Face)
+revision = "e1945c40cd546c78e41f1151f4db032b271faeaa"
 
 from huggingface_hub import snapshot_download
 
@@ -110,7 +110,7 @@ If a question does not make any sense, or is not factually coherent, explain why
 
 # Define PythonModel to log with mlflow.pyfunc.log_model
 
-class Llama2(mlflow.pyfunc.PythonModel):
+class Llama3(mlflow.pyfunc.PythonModel):
     def load_context(self, context):
         """
         This method initializes the tokenizer and language model
