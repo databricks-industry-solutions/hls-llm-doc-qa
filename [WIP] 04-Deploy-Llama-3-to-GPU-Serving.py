@@ -4,13 +4,18 @@
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC # Manage Llama-2-7B-Chat (base model) with MLFlow on Databricks
+# MAGIC # Manage Llama-3-8B-Instruct with MLFlow on Databricks
 # MAGIC
-# MAGIC [Llama 2](https://huggingface.co/meta-llama) is a collection of pretrained and fine-tuned generative text models ranging in scale from 7 billion to 70 billion parameters. It is trained with 2T tokens and supports context length window upto 4K tokens. [Llama-2-7b-chat-hf](https://huggingface.co/meta-llama/Llama-2-7b-chat-hf) is the 7B fine-tuned model, optimized for dialogue use cases and converted for the Hugging Face Transformers format.
+# MAGIC Meta developed and released the Meta Llama 3 family of large language models (LLMs), a collection of pretrained and instruction tuned generative text models in 8 and 70B sizes. The Llama 3 instruction tuned models are optimized for dialogue use cases and outperform many of the available open source chat models on common industry benchmarks. Further, in developing these models, we took great care to optimize helpfulness and safety. [Llama-3-8b-instruct](https://huggingface.co/meta-llama/Meta-Llama-3-8B-Instruct) is the 8B fine-tuned model, optimized for dialogue use cases and converted for the Hugging Face Transformers format.
 # MAGIC
 # MAGIC Environment for this notebook:
-# MAGIC - Runtime: 13.2 GPU ML Runtime
+# MAGIC - Runtime: 14.3 GPU ML Runtime
 # MAGIC - Instance: `g5.4xlarge` on AWS
+# MAGIC
+# MAGIC
+# MAGIC Databricks Model Serving now supports Foundation Model APIs which allow you to access and query state-of-the-art open models from a serving endpoint. With Foundation Model APIs, you can quickly and easily build applications that leverage a high-quality generative AI model without maintaining your own model deployment.
+# MAGIC
+# MAGIC
 # MAGIC
 # MAGIC GPU instances that have at least 16GB GPU memory would be enough for inference on single input (batch inference requires slightly more memory). On Azure, it is possible to use `Standard_NC6s_v3` or `Standard_NC4as_T4_v3`.
 # MAGIC
@@ -20,15 +25,43 @@
 # COMMAND ----------
 
 # MAGIC %pip install --upgrade "mlflow-skinny[databricks]>=2.4.1"
-# MAGIC %pip install safetensors
+# MAGIC %pip install --upgrade  databricks-sdk
+# MAGIC %pip install --upgrade safetensors
 # MAGIC dbutils.library.restartPython()
+
+# COMMAND ----------
+
+# where you want the PDFs to be saved in your environment
+dbutils.widgets.text("model_schema_path", "hls_llm_qa_demo.hls_demo_models")
+
+# which embeddings model from Hugging Face 🤗  you would like to use; for biomedical applications we have been using this model recently
+# also worth trying this model for embeddings for comparison: pritamdeka/BioBERT-mnli-snli-scinli-scitail-mednli-stsb
+dbutils.widgets.text("model_path", "hls_llm_qa_demo.hls_demo_models.hls_llm_qa_model")
+
+# where you want the vectorstore to be persisted across sessions, so that you don't have to regenerate
+dbutils.widgets.text("model_serving_path", "hls_llm_qa_model_endpoint")
+
+# COMMAND ----------
+
+model_schema_path = dbutils.widgets.get("model_schema_path")
+model_path = dbutils.widgets.get("model_path")
+model_serving_path = dbutils.widgets.get("model_serving_path")
 
 # COMMAND ----------
 
 from huggingface_hub import login
 
-# Login to Huggingface to get access to the model if you use the official version of Llama 2
+# Login to Huggingface to get access to the model if you use the official version of Llama 3
 login(token=dbutils.secrets.get('solution-accelerator-cicd', 'huggingface'))
+
+# login(token="PERSONAL ACCESS TOKEN")
+
+# COMMAND ----------
+
+import os 
+# url used to send the request to your model from the serverless endpoint
+host = "https://" + spark.conf.get("spark.databricks.workspaceUrl")
+os.environ['DATABRICKS_TOKEN'] = dbutils.secrets.get([SECRET_SCOPE], [SECRET])
 
 # COMMAND ----------
 
@@ -42,10 +75,10 @@ login(token=dbutils.secrets.get('solution-accelerator-cicd', 'huggingface'))
 
 # COMMAND ----------
 
-# it is suggested to pin the revision commit hash and not change it for reproducibility because the uploader might change the model afterwards; you can find the commmit history of llamav2-7b-chat in https://huggingface.co/meta-llama/Llama-2-7b-chat-hf/commits/main
+# it is suggested to pin the revision commit hash and not change it for reproducibility because the uploader might change the model afterwards; you can find the commmit history of llama-3-8b-instruct in https://huggingface.co/meta-llama/Meta-Llama-3-8B-Instruct
 
-model_id = "meta-llama/Llama-2-7b-chat-hf" # official version, gated (needs login to Hugging Face)
-revision = "01622a9d125d924bd828ab6c72c995d5eda92b8e"
+model_id = "meta-llama/Meta-Llama-3-8B-Instruct" # official version, gated (needs login to Hugging Face)
+revision = "e1945c40cd546c78e41f1151f4db032b271faeaa"
 
 from huggingface_hub import snapshot_download
 
@@ -77,7 +110,7 @@ If a question does not make any sense, or is not factually coherent, explain why
 
 # Define PythonModel to log with mlflow.pyfunc.log_model
 
-class Llama2(mlflow.pyfunc.PythonModel):
+class Llama3(mlflow.pyfunc.PythonModel):
     def load_context(self, context):
         """
         This method initializes the tokenizer and language model
@@ -141,7 +174,15 @@ class Llama2(mlflow.pyfunc.PythonModel):
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC Log the model to MLFlow
+# MAGIC Log the model to MLFlow and register the modl using Models in Unity Caalog 
+
+# COMMAND ----------
+
+# MAGIC %sql 
+# MAGIC
+# MAGIC CREATE CATALOG IF NOT EXISTS hls_llm_qa_demo_temp;
+# MAGIC
+# MAGIC CREATE DATABASE IF NOT EXISTS ${Model_Schema_Path}
 
 # COMMAND ----------
 
@@ -149,6 +190,9 @@ from mlflow.models.signature import ModelSignature
 from mlflow.types import DataType, Schema, ColSpec
 
 import pandas as pd
+
+mlflow.set_registry_uri("databricks-uc")
+model_name = model_path
 
 # Define input and output schema
 input_schema = Schema([
@@ -170,6 +214,7 @@ with mlflow.start_run() as run:
     mlflow.pyfunc.log_model(
         "model",
         python_model=Llama2(),
+        registered_model_name=model_name,
         artifacts={'repository' : snapshot_location},
         pip_requirements=["torch", "transformers", "accelerate", "safetensors"],
         input_example=input_example,
@@ -178,18 +223,12 @@ with mlflow.start_run() as run:
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ### Register the model
+# DBTITLE 1,Add Alias to the new model that was registered
+from mlflow import MlflowClient
+client = MlflowClient()
 
-# COMMAND ----------
-
-# Register model in MLflow Model Registry
-# This may take about 6 minutes to complete
-result = mlflow.register_model(
-    "runs:/"+run.info.run_id+"/model",
-    name="llama-2-7b-chat",
-    await_registration_for=1000,
-)
+# create "Champion" alias for version 1 of model 
+client.set_registered_model_alias(model_name, "Champion", 1)
 
 # COMMAND ----------
 
@@ -200,22 +239,26 @@ result = mlflow.register_model(
 
 # COMMAND ----------
 
-"""
 import mlflow
 import pandas as pd
 
-loaded_model = mlflow.pyfunc.load_model(f"models:/{registered_name}@Champion")
+# debug
+mlflow.set_registry_uri("databricks-uc")
+model_name =  model_path
+
+model_version_uri = f"models:/{model_name}@Champion"
+loaded_model = mlflow.pyfunc.load_model(model_version_uri)
+
+# COMMAND ----------
 
 # Make a prediction using the loaded model
 loaded_model.predict(
     {
-        "prompt": ["What is ML?", "What is large language model?"],
+        "prompt": ["What is ML?", "What is a large language model?"],
         "temperature": [0.1, 0.5],
         "max_new_tokens": [100, 100],
     }
 )
-
-"""
 
 # COMMAND ----------
 
@@ -230,79 +273,49 @@ loaded_model.predict(
 
 # COMMAND ----------
 
-#this should be the name of the registered model from the previous step
-model_name = 'llama-2-7b-chat'
-
-# Provide a name to the serving endpoint
-endpoint_name = 'llama-2-7b-chat'
-
-# COMMAND ----------
-
-import mlflow
-from mlflow.tracking.client import MlflowClient
-client = MlflowClient
-
-def get_latest_model_version(model_name: str):
-  client = MlflowClient()
-  models = client.get_latest_versions(model_name, stages=["None"])
-  for m in models:
-    new_model_version = m.version
-  return new_model_version
+# Helper function
+def get_latest_model_version(model_name):
+    mlflow_client = MlflowClient()
+    latest_version = 1
+    for mv in mlflow_client.search_model_versions(f"name='{model_name}'"):
+        version_int = int(mv.version)
+        if version_int > latest_version:
+            latest_version = version_int
+    return latest_version
 
 model_version = get_latest_model_version(model_name)
 
 # COMMAND ----------
 
-# MAGIC %run ./util/create-update-serving-endpoint
+# Create or update serving endpoint
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.serving import EndpointCoreConfigInput, ServedModelInput
 
-# COMMAND ----------
+serving_endpoint_name = model_serving_path
+latest_model_version = get_latest_model_version(model_name)
 
-served_models = [
-    {
-      "name": model_name,
-      "model_name": model_name,
-      "model_version": model_version,
-      "workload_size": "Small",
-      "workload_type": "GPU_MEDIUM",
-      "scale_to_zero_enabled": False
-    }
-]
-traffic_config = {"routes": [{"served_model_name": model_name, "traffic_percentage": "100"}]}
+w = WorkspaceClient()
+endpoint_config = EndpointCoreConfigInput(
+    name=serving_endpoint_name,
+    served_models=[
+        ServedModelInput(
+            model_name=model_name,
+            model_version=latest_model_version,
+            workload_size="Small",
+            scale_to_zero_enabled=True,
+            environment_vars={
+                "DATABRICKS_TOKEN": "{{secrets/scope/token}}",  # <scope>/<secret> that contains an access token
+            }
+        )
+    ]
+)
 
-# Create or update model serving endpoint
-
-if not endpoint_exists(endpoint_name):
-  create_endpoint(endpoint_name, served_models)
+existing_endpoint = next(
+    (e for e in w.serving_endpoints.list() if e.name == serving_endpoint_name), None
+)
+if existing_endpoint == None:
+    print(f"Creating the endpoint {serving_endpoint_name}, this will take a few minutes to package and deploy the endpoint...")
+    w.serving_endpoints.create_and_wait(name=serving_endpoint_name, config=endpoint_config)
 else:
-  update_endpoint(endpoint_name, served_models)
-
-# COMMAND ----------
-
-# MAGIC %md 
-# MAGIC (Optional) Use the SDK instead of the API Above
-
-# COMMAND ----------
-
-# from databricks.sdk import WorkspaceClient
-# from databricks.sdk.service.serving import *
-# from datetime import timedelta
-# w = WorkspaceClient()
-# served_models = [ServedModelInput(model_name=model_name, 
-#                                   model_version=model_version, 
-#                                   workload_size='Small',
-#                                   workload_type='GPU_MEDIUM', # additional param for GPU serving 
-#                                   scale_to_zero_enabled='False')]
-
-# try:
-#   w.serving_endpoints.create_and_wait(name=endpoint_name, 
-#                                      config=EndpointCoreConfigInput(served_models=served_models), 
-#                                      timeout=timedelta(minutes=40)) # extending timeout for GPU serving; default is 20
-# except: # when the endpoint already exists, update it
-#   w.serving_endpoints.update_config_and_wait(name=endpoint_name, 
-#                                              served_models=served_models, 
-#                                              timeout=timedelta(minutes=40))
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC Once the model serving endpoint is ready, you can query it easily with LangChain (see `04-LLM-Chain-with-GPU-Serving` for example code) running in the same workspace.
+    print(f"Updating the endpoint {serving_endpoint_name} to version {latest_model_version}, this will take a few minutes to package and deploy the endpoint...")
+    w.serving_endpoints.update_config_and_wait(served_models=endpoint_config.served_models, name=serving_endpoint_name)
